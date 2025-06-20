@@ -1,0 +1,5 @@
+/* App-specific styles */
+.app {
+  height: 100vh;
+  overflow: hidden;
+}

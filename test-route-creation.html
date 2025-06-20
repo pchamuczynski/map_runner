@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map Runner v2 Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { display: flex; gap: 20px; }
+        .controls { flex: 1; max-width: 300px; }
+        .iframe-container { flex: 2; }
+        button { padding: 10px 20px; margin: 5px 0; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; display: block; width: 100%; }
+        button:hover { background: #0056b3; }
+        textarea { width: 100%; height: 200px; margin: 10px 0; font-family: monospace; font-size: 12px; }
+        #app-iframe { width: 100%; height: 600px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Map Runner v2 - Route Creation Test</h1>
+    
+    <div class="container">
+        <div class="controls">
+            <h3>Test Controls</h3>
+            <button onclick="refreshApp()">Refresh App</button>
+            <button onclick="testRouteCreation()">Test Route Creation</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+            
+            <h4>Console Logs</h4>
+            <textarea id="logs" readonly></textarea>
+        </div>
+        
+        <div class="iframe-container">
+            <iframe id="app-iframe" src="http://localhost:5173/"></iframe>
+        </div>
+    </div>
+
+    <script>
+        let logMessages = [];
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logMessages.push(`[${timestamp}] ${message}`);
+            document.getElementById('logs').value = logMessages.join('\n');
+            document.getElementById('logs').scrollTop = document.getElementById('logs').scrollHeight;
+        }
+        
+        function refreshApp() {
+            addLog('Refreshing app...');
+            document.getElementById('app-iframe').src = document.getElementById('app-iframe').src;
+        }
+        
+        function testRouteCreation() {
+            addLog('Starting route creation test...');
+            addLog('1. Navigate to the app in the iframe');
+            addLog('2. Click "Create New Route"');
+            addLog('3. Enter "Warsaw, Poland" as start');
+            addLog('4. Enter "Krakow, Poland" as destination');
+            addLog('5. Check browser console for detailed logs');
+        }
+        
+        function clearLogs() {
+            logMessages = [];
+            document.getElementById('logs').value = '';
+        }
+        
+        // Monitor iframe for console messages (limited due to CORS)
+        window.addEventListener('message', function(event) {
+            if (event.origin === 'http://localhost:5173') {
+                addLog('App message: ' + event.data);
+            }
+        });
+        
+        addLog('Test page loaded. Use the iframe to test route creation.');
+        addLog('Open browser developer tools to see detailed console logs from the app.');
+    </script>
+</body>
+</html>

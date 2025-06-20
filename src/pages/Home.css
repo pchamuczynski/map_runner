@@ -1,0 +1,12 @@
+.home-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Ensure the layout works properly on different screen sizes */
+@media (max-width: 768px) {
+  .home-container {
+    flex-direction: column;
+  }
+}
