@@ -1,5 +1,5 @@
 .sidebar {
-  width: 290px;
+  width: var(--sidebar-width);
   height: 100vh;
   background-color: #f8f9fa;
   border-right: 1px solid #e0e0e0;
@@ -9,6 +9,7 @@
   left: 0;
   top: 0;
   z-index: 1000;
+  box-sizing: border-box;
 }
 
 .sidebar-header {
@@ -28,30 +29,19 @@
   letter-spacing: 0.5px;
 }
 
-.loading-indicator {
-  display: flex;
-  align-items: center;
-}
-
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #2196F3;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
 .sidebar-content {
   padding: 10px;
   flex: 1;
-  overflow-y: auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-empty {
+  color: #888;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 16px;
 }
 
 .add-route-btn {
@@ -63,23 +53,24 @@
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.add-route-btn:hover {
+.add-route-btn:hover:not(:disabled) {
   background-color: #0056b3;
 }
 
-.add-route-btn:active {
-  background-color: #004085;
+.add-route-btn:disabled {
+  background-color: #9ec5fe;
+  cursor: not-allowed;
 }
 
 .routes-list {
-  margin-top: 10px;
-  max-height: calc(100vh - 170px);
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0 8px 0 0;
+  flex: 1;
   overflow-y: auto;
-  padding-right: 8px;
 }
 
 .routes-list::-webkit-scrollbar {
@@ -96,26 +87,30 @@
   border-radius: 3px;
 }
 
-.routes-list::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
-
 .route-item {
   padding: 6px;
   background-color: #ffffff;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   margin-bottom: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
   display: flex;
   align-items: flex-start;
   gap: 6px;
 }
 
+.route-item:hover {
+  background-color: #f8f9fa;
+  border-color: #007bff;
+}
+
+.route-item.selected {
+  background-color: #e3f2fd;
+  border-color: #007bff;
+}
+
 .route-item.dragging {
   opacity: 0.5;
-  transform: rotate(2deg);
 }
 
 .drag-handle {
@@ -132,55 +127,33 @@
   color: #999;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.route-item:hover {
-  background-color: #f8f9fa;
-  border-color: #007bff;
-}
-
-.route-item.selected {
-  background-color: #e3f2fd;
-  border-color: #007bff;
-}
-
 .route-content {
   flex: 1;
   min-width: 0;
 }
 
-.delete-route-btn {
+.route-select {
+  display: block;
+  width: 100%;
+  padding: 0;
   background: none;
   border: none;
-  font-size: 16px;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
 }
 
-.delete-route-btn:hover {
-  opacity: 1;
-  background-color: #fee;
-}
-
-.route-name {
+.route-title {
+  display: block;
   font-weight: 600;
   color: #333;
   margin-bottom: 2px;
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .route-details {
+  display: block;
   font-size: 11px;
   color: #666;
 }
@@ -189,40 +162,31 @@
   font-weight: 500;
   color: #007bff;
   float: right;
+  margin-left: 4px;
 }
 
 .route-path {
+  display: block;
   margin: 1px 0;
   color: #555;
+  overflow-wrap: anywhere;
 }
 
 .route-activities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   color: #888;
   font-style: italic;
 }
 
-.route-workout-summary {
-  color: #666;
-  font-size: 10px;
-  margin-top: 2px;
-}
-
-.route-basic-stats {
-  display: flex;
-  justify-content: space-between;
+.route-activity {
+  display: inline-flex;
   align-items: center;
-  margin-top: 4px;
-  gap: 8px;
+  gap: 3px;
 }
 
-.route-progress-summary {
-  color: #2196F3;
-  font-size: 10px;
-  font-weight: 500;
-}
-
-/* Always visible progress and workout info */
-.route-progress-always {
+.route-progress {
   margin-top: 6px;
   padding-top: 4px;
   border-top: 1px solid #f0f0f0;
@@ -239,7 +203,7 @@
 
 .progress-fill-mini {
   height: 100%;
-  background-color: #2196F3;
+  background-color: #2196f3;
   transition: width 0.3s ease;
 }
 
@@ -257,35 +221,11 @@
 }
 
 .progress-percentage {
-  color: #2196F3;
+  color: #2196f3;
   font-size: 9px;
   font-weight: 500;
   min-width: 40px;
   text-align: center;
-}
-
-.add-workout-mini-btn {
-  width: 18px;
-  height: 18px;
-  border: 1px solid #2196F3;
-  border-radius: 50%;
-  background-color: white;
-  color: #2196F3;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  line-height: 1;
-  padding: 0;
-}
-
-.add-workout-mini-btn:hover {
-  background-color: #2196F3;
-  color: white;
-  transform: scale(1.1);
 }
 
 .progress-actions {
@@ -301,39 +241,52 @@
   background: none;
   color: #666;
   font-size: 10px;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
   padding: 0;
 }
 
 .expand-workouts-btn:hover {
-  color: #2196F3;
-  transform: scale(1.1);
+  color: #2196f3;
+}
+
+.add-workout-mini-btn {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #2196f3;
+  border-radius: 50%;
+  background-color: white;
+  color: #2196f3;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.add-workout-mini-btn:hover {
+  background-color: #2196f3;
+  color: white;
 }
 
 .expanded-workouts {
-  margin-top: 4px;
-  padding-top: 4px;
+  list-style: none;
+  margin: 4px -6px 0;
+  padding: 4px 0 0 12px;
   border-top: 1px solid #f0f0f0;
-  margin-left: -6px;
-  margin-right: -6px;
-  padding-left: 12px; /* Reduced from 18px to minimize left margin */
-  padding-right: 6px;
 }
 
 .workout-text-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 4px;
   padding: 2px 0;
   border-bottom: 1px solid #f8f8f8;
-  font-size: 10px;
-  width: 100%;
-  position: relative;
-  padding-right: 60px; /* Reduced to account for smaller gap between buttons */
 }
 
 .workout-text-item:last-child {
@@ -344,83 +297,19 @@
   flex: 1;
   font-size: 10px;
   color: #333;
-  line-height: 1.3;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.workout-text-info .activity-icon {
+  vertical-align: -2px;
+  margin-right: 3px;
+}
+
 .workout-text-info strong {
-  color: #2196F3;
-}
-
-.workout-actions-aligned {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.workout-actions-aligned .edit-workout-btn,
-.workout-actions-aligned .delete-workout-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  font-size: 14px; /* Same as route buttons */
-  opacity: 0.6;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-}
-
-.workout-actions-aligned .edit-workout-btn:hover {
-  opacity: 1;
-  background-color: #f0f0f0;
-}
-
-.workout-actions-aligned .delete-workout-btn:hover {
-  opacity: 1;
-  background-color: #ffebee;
-}
-
-.workout-actions {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.edit-workout-btn,
-.delete-workout-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-size: 10px;
-  opacity: 0.6;
-  transition: all 0.2s;
-}
-
-.edit-workout-btn:hover {
-  opacity: 1;
-  background-color: #e3f2fd;
-}
-
-.delete-workout-btn:hover {
-  opacity: 1;
-  background-color: #ffebee;
+  color: #2196f3;
 }
 
 .no-workouts {
@@ -431,20 +320,19 @@
   padding: 4px;
 }
 
-.route-buttons {
+.item-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
 }
 
-.edit-route-btn {
+.icon-btn {
   background: none;
   border: none;
   font-size: 14px;
-  cursor: pointer;
   opacity: 0.6;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
   padding: 4px;
   border-radius: 4px;
   display: flex;
@@ -452,10 +340,24 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  flex-shrink: 0;
 }
 
-.edit-route-btn:hover {
+.icon-btn:hover {
   opacity: 1;
   background-color: #f0f0f0;
+}
+
+.icon-btn-danger:hover {
+  background-color: #ffebee;
+}
+
+.route-auto-import {
+  display: block;
+  margin-top: 2px;
+  color: #2e7d32;
+  font-size: 10px;
+}
+
+.route-auto-import.route-completed {
+  color: #888;
 }

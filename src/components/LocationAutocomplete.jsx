@@ -1,162 +1,109 @@
-/**
- * Autocomplete input component for location search
- */
-import { useState, useEffect, useRef } from 'react';
-import { isGoogleMapsEnabled } from '../utils/mapConfig';
+import { useId, useState } from 'react';
+import { usePlaceSuggestions } from '../hooks/usePlaceSuggestions';
 import './LocationAutocomplete.css';
 
-const LocationAutocomplete = ({ 
-  value, 
-  onChange, 
-  placeholder, 
-  required = false,
-  label 
-}) => {
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [isLoading, setIsLoading] = useState(false);
-  const inputRef = useRef(null);
-  const suggestionsRef = useRef(null);
-  const searchTimeoutRef = useRef(null);
+const LocationAutocomplete = ({ label, value, onChange, placeholder, maxLength, required = false, error }) => {
+  const id = useId();
+  const listId = `${id}-suggestions`;
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  // The value last picked from the list; don't search again for text we just filled in.
+  const [pickedValue, setPickedValue] = useState(value);
 
-  // Load the appropriate search service
-  const searchPlaces = async (query) => {
-    if (isGoogleMapsEnabled()) {
-      const service = await import('../services/simpleGoogleMaps');
-      return service.searchPlaces(query);
-    } else {
-      const service = await import('../services/simpleOSRM');
-      return service.searchPlaces(query);
-    }
-  };
+  const { suggestions, isLoading } = usePlaceSuggestions(value, { enabled: value !== pickedValue });
+  const showList = isOpen && suggestions.length > 0 && value !== pickedValue;
 
-  // Debounced search
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (value && value.length >= 3) {
-      setIsLoading(true);
-      searchTimeoutRef.current = setTimeout(async () => {
-        try {
-          const results = await searchPlaces(value);
-          setSuggestions(results);
-          setShowSuggestions(true);
-          setSelectedIndex(-1);
-        } catch (error) {
-          console.error('Search failed:', error);
-          setSuggestions([]);
-        } finally {
-          setIsLoading(false);
-        }
-      }, 300);
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setIsLoading(false);
-    }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [value]);
-
-  const handleInputChange = (e) => {
-    onChange(e.target.value);
-  };
-
-  const handleSuggestionClick = (suggestion) => {
+  const pick = (suggestion) => {
+    setPickedValue(suggestion.description);
     onChange(suggestion.description);
-    setShowSuggestions(false);
-    setSuggestions([]);
-    setSelectedIndex(-1);
+    setIsOpen(false);
+    setActiveIndex(-1);
   };
 
   const handleKeyDown = (e) => {
-    if (!showSuggestions || suggestions.length === 0) return;
-
+    if (!showList) return;
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
-          prev < suggestions.length - 1 ? prev + 1 : 0
-        );
+        setActiveIndex((i) => (i + 1) % suggestions.length);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => 
-          prev > 0 ? prev - 1 : suggestions.length - 1
-        );
+        setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
         break;
       case 'Enter':
-        e.preventDefault();
-        if (selectedIndex >= 0 && suggestions[selectedIndex]) {
-          handleSuggestionClick(suggestions[selectedIndex]);
+        if (activeIndex >= 0) {
+          e.preventDefault();
+          pick(suggestions[activeIndex]);
         }
         break;
       case 'Escape':
-        setShowSuggestions(false);
-        setSelectedIndex(-1);
+        e.stopPropagation();
+        setIsOpen(false);
         break;
-    }
-  };
-
-  const handleBlur = (e) => {
-    // Delay hiding suggestions to allow clicks
-    setTimeout(() => {
-      setShowSuggestions(false);
-      setSelectedIndex(-1);
-    }, 150);
-  };
-
-  const handleFocus = () => {
-    if (suggestions.length > 0) {
-      setShowSuggestions(true);
+      default:
+        break;
     }
   };
 
   return (
     <div className="location-autocomplete">
-      {label && <label>{label}</label>}
+      <label htmlFor={id}>{label}</label>
       <div className="input-container">
         <input
-          ref={inputRef}
+          id={id}
           type="text"
+          role="combobox"
+          aria-expanded={showList}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={showList && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
+          aria-invalid={Boolean(error)}
+          autoComplete="off"
           value={value}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          onFocus={handleFocus}
+          maxLength={maxLength}
           placeholder={placeholder}
           required={required}
-          className={showSuggestions ? 'has-suggestions' : ''}
+          className={showList ? 'has-suggestions' : ''}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setIsOpen(true);
+            setActiveIndex(-1);
+          }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => setIsOpen(false)}
         />
-        
+
         {isLoading && (
-          <div className="loading-indicator">
-            <div className="spinner"></div>
+          <div className="input-spinner" aria-hidden="true">
+            <div className="spinner" />
           </div>
         )}
 
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="suggestions-dropdown" ref={suggestionsRef}>
+        {showList && (
+          <ul className="suggestions-dropdown" id={listId} role="listbox">
             {suggestions.map((suggestion, index) => (
-              <div
+              <li
                 key={suggestion.id}
-                className={`suggestion-item ${index === selectedIndex ? 'selected' : ''}`}
-                onClick={() => handleSuggestionClick(suggestion)}
+                id={`${listId}-${index}`}
+                role="option"
+                aria-selected={index === activeIndex}
+                className={`suggestion-item ${index === activeIndex ? 'selected' : ''}`}
+                // mousedown fires before the input's blur, so the click is not lost
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(suggestion);
+                }}
               >
-                <div className="suggestion-main">{suggestion.main_text}</div>
-                <div className="suggestion-secondary">{suggestion.secondary_text}</div>
-              </div>
+                <div className="suggestion-main">{suggestion.mainText}</div>
+                {suggestion.secondaryText && <div className="suggestion-secondary">{suggestion.secondaryText}</div>}
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 };

@@ -1,0 +1,35 @@
+.activity-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.form-group .activity-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.form-group .activity-option:hover {
+  border-color: #90caf9;
+}
+
+.form-group .activity-option:has(input:checked) {
+  background: #e3f2fd;
+  border-color: #90caf9;
+}
+
+.activity-picker[aria-invalid='true'] .activity-option {
+  border-color: #dc3545;
+}
+
+.activity-icon {
+  flex-shrink: 0;
+}

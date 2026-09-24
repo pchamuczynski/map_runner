@@ -1,0 +1,34 @@
+.home-page {
+  --sidebar-width: 290px;
+  display: flex;
+  height: 100vh;
+}
+
+.map-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--sidebar-width);
+  min-width: 0;
+}
+
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: white;
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.map-header h1 {
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.page-alert {
+  margin: 8px 20px 0;
+}
