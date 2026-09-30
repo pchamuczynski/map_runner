@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
+import AccountMenu from '../components/AccountMenu';
 import RouteMap from '../components/map/RouteMap';
 import RouteForm from '../components/RouteForm';
 import Sidebar from '../components/Sidebar';
 import WorkoutForm from '../components/WorkoutForm';
-import { useRoutes } from '../state/contexts';
+import { useAuth, useConfirm, useRoutes } from '../state/contexts';
 import './HomePage.css';
 
 /**
@@ -16,6 +17,8 @@ import './HomePage.css';
 
 const HomePage = () => {
   const { routes, status, error, saveError, actions } = useRoutes();
+  const { notice, dismissNotice } = useAuth();
+  const confirm = useConfirm();
   const [selectedRouteId, setSelectedRouteId] = useState(null);
   /** @type {[Dialog, Function]} */
   const [dialog, setDialog] = useState(null);
@@ -40,20 +43,21 @@ const HomePage = () => {
   );
 
   const handleDeleteRoute = useCallback(
-    (routeId) => {
-      if (!window.confirm('Delete this route and all its workouts?')) return;
+    async (routeId, anchor) => {
+      const confirmed = await confirm({ anchor, message: 'Delete this route and all its workouts?' });
+      if (!confirmed) return;
       actions.deleteRoute(routeId);
       setSelectedRouteId((current) => (current === routeId ? null : current));
       setDialog((current) => (current?.routeId === routeId ? null : current));
     },
-    [actions],
+    [actions, confirm],
   );
 
   const handleDeleteWorkout = useCallback(
-    (routeId, workoutId) => {
-      if (window.confirm('Delete this workout?')) actions.deleteWorkout(routeId, workoutId);
+    async (routeId, workoutId, anchor) => {
+      if (await confirm({ anchor, message: 'Delete this workout?' })) actions.deleteWorkout(routeId, workoutId);
     },
-    [actions],
+    [actions, confirm],
   );
 
   const handleRouteSubmit = (route) => {
@@ -88,8 +92,17 @@ const HomePage = () => {
       <main className="map-area">
         <header className="map-header">
           <h1>Map Runner v2</h1>
+          <AccountMenu />
         </header>
 
+        {notice && (
+          <div className="page-alert alert alert-info" role="status">
+            <span className="page-alert-text">{notice}</span>
+            <button type="button" className="close-btn" onClick={dismissNotice} aria-label="Dismiss">
+              ×
+            </button>
+          </div>
+        )}
         {status === 'error' && (
           <div className="page-alert alert alert-error" role="alert">
             Your routes could not be loaded: {error?.message}

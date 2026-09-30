@@ -1,0 +1,44 @@
+.account-menu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.account-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.account-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1976d2;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-name {
+  font-weight: 500;
+  color: #333;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sign-in,
+.account-log-out {
+  min-width: 0;
+  padding: 6px 14px;
+}
+
+.account-error {
+  color: #dc3545;
+  font-size: 12px;
+}

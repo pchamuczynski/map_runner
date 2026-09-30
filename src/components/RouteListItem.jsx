@@ -126,7 +126,7 @@ const RouteListItem = memo(function RouteListItem({
                       <button
                         type="button"
                         className="icon-btn icon-btn-danger"
-                        onClick={() => onDeleteWorkout(route.id, workout.id)}
+                        onClick={(e) => onDeleteWorkout(route.id, workout.id, e.currentTarget)}
                         title="Delete workout"
                       >
                         🗑️
@@ -146,7 +146,7 @@ const RouteListItem = memo(function RouteListItem({
         <button type="button" className="icon-btn" onClick={() => onEdit(route.id)} title="Edit route">
           ✏️
         </button>
-        <button type="button" className="icon-btn icon-btn-danger" onClick={() => onDelete(route.id)} title="Delete route">
+        <button type="button" className="icon-btn icon-btn-danger" onClick={(e) => onDelete(route.id, e.currentTarget)} title="Delete route">
           🗑️
         </button>
       </div>

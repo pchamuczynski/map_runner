@@ -1,0 +1,51 @@
+.auth-dialog .dialog-header {
+  margin-bottom: 16px;
+}
+
+.google-button {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: #999;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid #e0e0e0;
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.auth-switch {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: #555;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #007bff;
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}

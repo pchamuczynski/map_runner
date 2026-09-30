@@ -18,10 +18,10 @@
  *   createdAt: string,
  * }} Route
  */
-import { createId } from '../lib/id';
-import { normalizeActivities } from './activities';
-import { resolveAutoImport, validateAutoImport } from './autoImport';
-import { sortWorkoutsByDate, totalDistance } from './workout';
+import { createId } from '../lib/id.js';
+import { normalizeActivities } from './activities.js';
+import { resolveAutoImport, validateAutoImport } from './autoImport.js';
+import { sortWorkoutsByDate, totalDistance } from './workout.js';
 
 export const ROUTE_LIMITS = Object.freeze({
   MAX_NAME_LENGTH: 100,

@@ -6,7 +6,6 @@ import { ACTIVITIES } from '../domain/activities';
 import { WORKOUT_LIMITS, createWorkout, validateWorkoutInput } from '../domain/workout';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { todayLocalIsoDate } from '../lib/format';
-import './WorkoutForm.css';
 
 /**
  * @param {{

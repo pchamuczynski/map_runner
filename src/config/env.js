@@ -14,7 +14,8 @@ export const config = Object.freeze({
   apiBaseUrl,
   googleClientId,
   features: Object.freeze({
-    // Accounts and integrations need the backend: tokens and client secrets must never live in the browser.
+    // Accounts and integrations need the backend: passwords, tokens and client secrets never live in the browser.
+    accounts: Boolean(apiBaseUrl),
     googleSignIn: Boolean(apiBaseUrl && googleClientId),
     strava: Boolean(apiBaseUrl) && flag(env.VITE_ENABLE_STRAVA),
     garmin: Boolean(apiBaseUrl) && flag(env.VITE_ENABLE_GARMIN),

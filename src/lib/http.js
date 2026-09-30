@@ -1,12 +1,20 @@
 const DEFAULT_TIMEOUT_MS = 10000;
 
 export class HttpError extends Error {
-  constructor(message, status) {
+  constructor(message, status, body = null) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
+    this.body = body;
   }
 }
+
+/** Uses the server's `{ error }` message when it sent one (rendered as text, never HTML). */
+const errorFromResponse = async (response) => {
+  const body = await response.json().catch(() => null);
+  const message = typeof body?.error === 'string' ? body.error : `Request failed with status ${response.status}`;
+  return new HttpError(message, response.status, body);
+};
 
 /**
  * fetch() wrapper that enforces a timeout, honours a caller's AbortSignal,
@@ -26,9 +34,8 @@ export const fetchJson = async (url, { signal, timeoutMs = DEFAULT_TIMEOUT_MS, .
     throw error;
   }
 
-  if (!response.ok) {
-    throw new HttpError(`Request failed with status ${response.status}`, response.status);
-  }
+  if (!response.ok) throw await errorFromResponse(response);
+  if (response.status === 204) return null;
   return response.json();
 };
 

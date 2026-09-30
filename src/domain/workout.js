@@ -12,8 +12,8 @@
  * @property {string | null} startedAt   Exact start time (ISO) for imported workouts; null for manual ones.
  * @property {string} createdAt    ISO timestamp.
  */
-import { ACTIVITIES } from './activities';
-import { createId } from '../lib/id';
+import { ACTIVITIES } from './activities.js';
+import { createId } from '../lib/id.js';
 
 export const WORKOUT_SOURCES = Object.freeze({
   MANUAL: 'manual',

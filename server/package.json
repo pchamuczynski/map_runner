@@ -1,0 +1,26 @@
+{
+  "name": "map-runner-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Map Runner API: accounts, sessions and route storage",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --watch --env-file-if-exists=.env src/index.js"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.2.1",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "google-auth-library": "^11.1.0",
+    "helmet": "^8.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.0"
+  }
+}

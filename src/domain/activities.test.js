@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACTIVITIES, isWorkoutActivity, normalizeActivities, normalizeActivity } from './activities';
+import { ACTIVITIES, isWorkoutActivity, normalizeActivities, normalizeActivity } from './activities.js';
 import { validateRouteInput } from './route';
 import { validateWorkoutInput } from './workout';
 

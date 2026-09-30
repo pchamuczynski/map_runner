@@ -1,6 +1,6 @@
 # Map Runner v2 - AI assistant instructions
 
-React 19 + Vite SPA that shows workout progress along real-world routes. See README.md for setup,
+React 19 + Vite SPA that shows workout progress along real-world routes, with a Node/Express API in `server/`. See README.md for setup,
 architecture and the backend contract.
 
 ## Rules
@@ -11,4 +11,8 @@ architecture and the backend contract.
 - Map service URLs live only in `src/config/mapServices.js` (the CSP is generated from it).
 - Never mutate state (e.g. `array.sort()` on props); use the domain helpers.
 - Functional components and hooks, accessible markup (real buttons, labels, ARIA for custom widgets).
+- `src/domain` and `src/lib` are shared with the server (`server/`): keep them free of browser/Vite APIs and use
+  explicit `.js` extensions in their relative imports.
+- Server: validate every request body with zod, return errors as `{ error }` via `HttpError`, never log or return
+  secrets, password hashes or session tokens.
 - Run `npm run lint` and `npm test` before finishing.

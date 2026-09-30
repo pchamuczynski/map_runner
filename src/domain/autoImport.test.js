@@ -7,7 +7,7 @@ import {
   resolveAutoImport,
   validateAutoImport,
 } from './autoImport';
-import { ACTIVITIES } from './activities';
+import { ACTIVITIES } from './activities.js';
 import { createRoute, updateRoute, validateRouteInput } from './route';
 import { createWorkout } from './workout';
 

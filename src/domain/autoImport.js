@@ -14,8 +14,8 @@
  *                                    Kept while disabled so re-enabling restores the choice.
  * @property {string | null} since    ISO timestamp of when auto-import was switched on; null while off.
  */
-import { ACTIVITIES, normalizeActivities } from './activities';
-import { mergeImportedWorkouts, sortWorkoutsByDate, totalDistance } from './workout';
+import { ACTIVITIES, normalizeActivities } from './activities.js';
+import { mergeImportedWorkouts, sortWorkoutsByDate, totalDistance } from './workout.js';
 
 export const DEFAULT_AUTO_IMPORT = Object.freeze({ enabled: false, activities: [], since: null });
 

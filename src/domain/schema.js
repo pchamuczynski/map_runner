@@ -3,11 +3,11 @@
  * Anything malformed is dropped rather than allowed to crash the UI.
  * Also migrates the legacy v1 shape (numeric ids, `created`, `timestamp`, stored `coveredDistance`).
  */
-import { isValidCoordinate } from '../lib/geo';
-import { isWorkoutActivity, normalizeActivities } from './activities';
-import { normalizeAutoImport } from './autoImport';
-import { ROUTE_LIMITS, cleanText } from './route';
-import { WORKOUT_LIMITS, WORKOUT_SOURCES, isValidIsoDate, sortWorkoutsByDate } from './workout';
+import { isValidCoordinate } from '../lib/geo.js';
+import { isWorkoutActivity, normalizeActivities } from './activities.js';
+import { normalizeAutoImport } from './autoImport.js';
+import { ROUTE_LIMITS, cleanText } from './route.js';
+import { WORKOUT_LIMITS, WORKOUT_SOURCES, isValidIsoDate, sortWorkoutsByDate } from './workout.js';
 
 const SOURCES = new Set(Object.values(WORKOUT_SOURCES));
 

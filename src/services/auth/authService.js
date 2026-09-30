@@ -1,17 +1,14 @@
 /**
- * Authentication.
+ * Accounts: email + password and Google sign-in, backed by the Map Runner API.
  *
- * Today every visitor is the local guest user and data stays in the browser.
+ * Without an API (VITE_API_BASE_URL empty) everyone is the local guest and data stays
+ * in this browser. Sessions are HttpOnly cookies set by the server; nothing
+ * authentication-related is stored by this code.
  *
- * Planned Google sign-in flow (enabled by config.features.googleSignIn):
- *  1. Load Google Identity Services (https://accounts.google.com/gsi/client) and
- *     obtain an ID token (JWT) for config.googleClientId.
- *  2. POST it to `/auth/google`; the backend verifies signature, `aud` and `exp`,
- *     upserts the user and sets an HttpOnly session cookie.
- *  3. `getCurrentUser()` reads `/auth/me`; the route repository switches to the API.
- * The ID token is never persisted in the browser.
- *
- * @typedef {{ id: string, name: string, email?: string, avatarUrl?: string, isGuest: boolean }} User
+ * @typedef {{
+ *   id: string, name: string, email?: string, avatarUrl?: string | null,
+ *   hasPassword?: boolean, googleLinked?: boolean, isGuest: boolean,
+ * }} User
  */
 import { config } from '../../config/env';
 import { apiRequest } from '../api/apiClient';
@@ -19,27 +16,45 @@ import { apiRequest } from '../api/apiClient';
 /** @type {User} */
 export const GUEST_USER = Object.freeze({ id: 'guest', name: 'Guest', isGuest: true });
 
-export const isSignInAvailable = () => config.features.googleSignIn;
+export const areAccountsAvailable = () => config.features.accounts;
+export const isGoogleSignInAvailable = () => config.features.googleSignIn;
+
+const toUser = (user) => ({ ...user, id: String(user.id), isGuest: false });
 
 /** @returns {Promise<User>} */
 export const getCurrentUser = async ({ signal } = {}) => {
-  if (!isSignInAvailable()) return GUEST_USER;
+  if (!areAccountsAvailable()) return GUEST_USER;
   try {
-    const user = await apiRequest('/auth/me', { signal });
-    return user?.id ? { ...user, id: String(user.id), isGuest: false } : GUEST_USER;
+    const { user } = await apiRequest('/auth/me', { signal, authenticated: false });
+    return toUser(user);
   } catch (error) {
     if (error?.status === 401) return GUEST_USER;
     throw error;
   }
 };
 
-/** @returns {Promise<User>} */
-export const signInWithGoogle = async () => {
-  if (!isSignInAvailable()) throw new Error('Google sign-in is not configured');
-  throw new Error('Google sign-in is not implemented yet'); // see flow above
+/** @returns {Promise<{ user: User, notice: string | null }>} */
+export const register = async ({ email, password, name }) => {
+  const { user } = await apiRequest('/auth/register', { method: 'POST', body: { email, password, name }, authenticated: false });
+  return { user: toUser(user), notice: null };
 };
 
-export const signOut = async () => {
-  if (isSignInAvailable()) await apiRequest('/auth/logout', { method: 'POST' });
+/** @returns {Promise<{ user: User, notice: string | null }>} */
+export const logIn = async ({ email, password }) => {
+  const { user } = await apiRequest('/auth/login', { method: 'POST', body: { email, password }, authenticated: false });
+  return { user: toUser(user), notice: null };
+};
+
+/**
+ * @param {string} credential  Google ID token from Google Identity Services; verified by the server.
+ * @returns {Promise<{ user: User, notice: string | null }>}
+ */
+export const logInWithGoogle = async (credential) => {
+  const { user, notice } = await apiRequest('/auth/google', { method: 'POST', body: { credential }, authenticated: false });
+  return { user: toUser(user), notice: notice ?? null };
+};
+
+export const logOut = async () => {
+  await apiRequest('/auth/logout', { method: 'POST', authenticated: false });
   return GUEST_USER;
 };
