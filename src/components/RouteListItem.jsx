@@ -1,7 +1,7 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { completionDate, isRouteCompleted } from '../domain/autoImport';
 import { getCoveredDistance, getProgress } from '../domain/route';
-import { formatDate, formatDateTime, formatDistance, formatPercent } from '../lib/format';
+import { formatDate, formatDateTime, formatDistance, formatPercent, placeCity } from '../lib/format';
 import ActivityIcon from './ActivityIcon';
 
 const RouteListItem = memo(function RouteListItem({
@@ -24,6 +24,7 @@ const RouteListItem = memo(function RouteListItem({
   const workoutsId = `workouts-${route.id}`;
   const completed = isRouteCompleted(route);
   const finishedOn = completionDate(route);
+  const [folded, setFolded] = useState(completed);
 
   return (
     <li
@@ -39,35 +40,58 @@ const RouteListItem = memo(function RouteListItem({
       </div>
 
       <div className="route-content">
-        <button type="button" className="route-select" onClick={() => onSelect(route.id)} aria-pressed={isSelected}>
-          <span className="route-title">{route.name}</span>
-          <span className="route-details">
-            <span className="route-distance">{formatDistance(route.distance)}</span>
-            <span className="route-path">
-              {route.from} → {route.to}
-            </span>
-            <span className="route-activities">
-              {route.activities.length > 0
-                ? route.activities.map((activity) => (
-                    <span key={activity} className="route-activity">
-                      <ActivityIcon activity={activity} size={12} />
-                      {activity}
-                    </span>
-                  ))
-                : 'No activities'}
-            </span>
-            {completed && finishedOn && (
-              <span className="route-auto-import route-completed">Completed on {formatDate(finishedOn)}</span>
-            )}
-            {!completed && route.autoImport.enabled && (
-              <span className="route-auto-import" title={`Importing workouts recorded since ${formatDateTime(route.autoImport.since)}`}>
-                🔄 Auto-import: {route.autoImport.activities.join(', ')}
+        <div className="route-fold-row">
+          <button
+            type="button"
+            className="fold-route-btn"
+            onClick={() => setFolded((value) => !value)}
+            aria-expanded={!folded}
+            title={folded ? 'Unfold route' : 'Fold route'}
+            aria-label={folded ? `Unfold ${route.name}` : `Fold ${route.name}`}
+          >
+            {folded ? '▶' : '▼'}
+          </button>
+          <button type="button" className="route-select" onClick={() => onSelect(route.id)} aria-pressed={isSelected}>
+            <span className="route-title">{route.name}</span>
+            {folded ? (
+              <span className="route-details">
+                <span className="route-path">
+                  {placeCity(route.from)} → {placeCity(route.to)}
+                </span>
+                <span className="route-covered">
+                  {formatDistance(getCoveredDistance(route))} / {formatDistance(route.distance)}
+                </span>
+              </span>
+            ) : (
+              <span className="route-details">
+                <span className="route-distance">{formatDistance(route.distance)}</span>
+                <span className="route-path">
+                  {route.from} → {route.to}
+                </span>
+                <span className="route-activities">
+                  {route.activities.length > 0
+                    ? route.activities.map((activity) => (
+                        <span key={activity} className="route-activity">
+                          <ActivityIcon activity={activity} size={12} />
+                          {activity}
+                        </span>
+                      ))
+                    : 'No activities'}
+                </span>
+                {completed && finishedOn && (
+                  <span className="route-auto-import route-completed">Completed on {formatDate(finishedOn)}</span>
+                )}
+                {!completed && route.autoImport.enabled && (
+                  <span className="route-auto-import" title={`Importing workouts recorded since ${formatDateTime(route.autoImport.since)}`}>
+                    🔄 Auto-import: {route.autoImport.activities.join(', ')}
+                  </span>
+                )}
               </span>
             )}
-          </span>
-        </button>
+          </button>
+        </div>
 
-        <div className="route-progress">
+        {!folded && <div className="route-progress">
           <div
             className="progress-bar-mini"
             role="progressbar"
@@ -147,7 +171,7 @@ const RouteListItem = memo(function RouteListItem({
               )}
             </ul>
           )}
-        </div>
+        </div>}
       </div>
 
       <div className="item-actions">

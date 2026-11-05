@@ -1,3 +1,6 @@
+/** Place labels are "City, county, country". The folded route shows the city. */
+export const placeCity = (label) => String(label ?? '').split(',')[0].trim();
+
 export const formatDistance = (meters) => {
   const value = Number(meters) || 0;
   if (value >= 1000) {

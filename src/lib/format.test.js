@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDistance, formatDuration, todayLocalIsoDate } from './format';
+import { formatDistance, formatDuration, placeCity, todayLocalIsoDate } from './format';
 
 describe('format', () => {
   it('formats distances', () => {
@@ -11,6 +11,12 @@ describe('format', () => {
   it('formats durations', () => {
     expect(formatDuration(59 * 60)).toBe('59m');
     expect(formatDuration(3 * 3600 + 5 * 60)).toBe('3h 5m');
+  });
+
+  it('keeps only the city from a place label', () => {
+    expect(placeCity('Wrocław, Lower Silesian Voivodeship, Poland')).toBe('Wrocław');
+    expect(placeCity('Oslo, Norway')).toBe('Oslo');
+    expect(placeCity('Gdynia')).toBe('Gdynia');
   });
 
   it('uses the local calendar day for "today"', () => {
