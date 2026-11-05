@@ -19,7 +19,8 @@ import { mapStravaActivity } from './strava';
 
 export const INTEGRATIONS = Object.freeze({
   strava: { id: 'strava', label: 'Strava', enabled: config.features.strava, mapActivity: mapStravaActivity },
-  garmin: { id: 'garmin', label: 'Garmin Connect', enabled: config.features.garmin, mapActivity: mapGarminActivity },
+  // Garmin is offered to every signed-in user. The server refuses to connect until its API credentials are set.
+  garmin: { id: 'garmin', label: 'Garmin', enabled: config.features.accounts, mapActivity: mapGarminActivity },
 });
 
 const getIntegration = (id) => {
@@ -41,14 +42,27 @@ export const toWorkouts = (id, rawActivities) => {
     .filter(Boolean);
 };
 
+/** Providers the signed-in user has already authorised. */
+export const listConnections = async () => {
+  const body = await apiRequest('/integrations');
+  return Array.isArray(body?.connected) ? body.connected : [];
+};
+
+export const disconnectIntegration = (id) => apiRequest(`/integrations/${getIntegration(id).id}`, { method: 'DELETE' });
+
 /**
  * @param {string} id  Integration id.
- * @param {{ since?: string, signal?: AbortSignal }} [options]  `since` is an ISO timestamp.
+ * @param {{ since?: string, from?: string, to?: string, signal?: AbortSignal }} [options]
+ *   `since` is an ISO timestamp for the automatic sync. `from` and `to` are `YYYY-MM-DD` for a history import.
  */
-export const fetchNewWorkouts = async (id, { since, signal } = {}) => {
+export const fetchNewWorkouts = async (id, { since, from, to, signal } = {}) => {
   const integration = getIntegration(id);
-  const query = since ? `?${new URLSearchParams({ since })}` : '';
-  const activities = await apiRequest(`/integrations/${integration.id}/activities${query}`, { signal });
+  const params = new URLSearchParams();
+  if (since) params.set('since', since);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const query = params.size > 0 ? `?${params}` : '';
+  const activities = await apiRequest(`/integrations/${integration.id}/activities${query}`, { signal, timeoutMs: 60_000 });
   return toWorkouts(integration.id, activities);
 };
 

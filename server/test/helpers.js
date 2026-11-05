@@ -11,10 +11,15 @@ const fakeGoogleVerifier = async (credential) => {
   return { emailVerified: true, name: null, picture: null, ...JSON.parse(credential) };
 };
 
-export const createTestServer = ({ googleEnabled = true, env = {} } = {}) => {
+export const createTestServer = ({ googleEnabled = true, env = {}, garmin } = {}) => {
   const config = loadConfig({ NODE_ENV: 'test', DATABASE_PATH: ':memory:', APP_ORIGIN: ORIGIN, ...env });
   const db = openDatabase(':memory:');
-  const { app, sessions } = createApp({ config, db, verifyGoogleCredential: googleEnabled ? fakeGoogleVerifier : null });
+  const { app, sessions } = createApp({
+    config,
+    db,
+    verifyGoogleCredential: googleEnabled ? fakeGoogleVerifier : null,
+    ...(garmin ? { garmin } : {}),
+  });
 
   /** A cookie-keeping client that sends the headers the real frontend sends. */
   const client = () => {
@@ -24,6 +29,7 @@ export const createTestServer = ({ googleEnabled = true, env = {} } = {}) => {
       get: (path) => agent.get(path),
       post: (path, body) => withHeaders(agent.post(path)).send(body),
       put: (path, body) => withHeaders(agent.put(path)).send(body),
+      del: (path) => withHeaders(agent.delete(path)),
       raw: agent,
     };
   };

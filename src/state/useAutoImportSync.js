@@ -21,7 +21,9 @@ export const useAutoImportSync = ({ status, routes, importWorkouts }) => {
     const sync = async () => {
       try {
         const { workouts, errors } = await syncEnabledIntegrations({ since, signal: controller.signal });
-        errors.forEach(({ id, error }) => console.warn(`Workout sync from ${id} failed`, error));
+        errors
+          .filter(({ error }) => error?.status !== 404 && error?.status !== 503)
+          .forEach(({ id, error }) => console.warn(`Workout sync from ${id} failed`, error));
         if (workouts.length > 0) importWorkouts(workouts);
       } catch (error) {
         if (!isAbortError(error)) console.warn('Workout sync failed', error);

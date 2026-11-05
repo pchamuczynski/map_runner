@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { isRouteCompleted } from '../domain/autoImport';
+import { completionDate, isRouteCompleted } from '../domain/autoImport';
 import { getCoveredDistance, getProgress } from '../domain/route';
 import { formatDate, formatDateTime, formatDistance, formatPercent } from '../lib/format';
 import ActivityIcon from './ActivityIcon';
@@ -14,6 +14,7 @@ const RouteListItem = memo(function RouteListItem({
   onEdit,
   onDelete,
   onAddWorkout,
+  onImportPast,
   onEditWorkout,
   onDeleteWorkout,
   dragHandlers,
@@ -21,6 +22,8 @@ const RouteListItem = memo(function RouteListItem({
   const progress = getProgress(route);
   const workoutCount = route.workouts.length;
   const workoutsId = `workouts-${route.id}`;
+  const completed = isRouteCompleted(route);
+  const finishedOn = completionDate(route);
 
   return (
     <li
@@ -28,7 +31,7 @@ const RouteListItem = memo(function RouteListItem({
       draggable
       onDragStart={(e) => dragHandlers.onDragStart(e, route.id)}
       onDragEnd={dragHandlers.onDragEnd}
-      onDragOver={dragHandlers.onDragOver}
+      onDragOver={(e) => dragHandlers.onDragOver(e, route.id)}
       onDrop={(e) => dragHandlers.onDrop(e, route.id)}
     >
       <div className="drag-handle" aria-hidden="true">
@@ -53,14 +56,14 @@ const RouteListItem = memo(function RouteListItem({
                   ))
                 : 'No activities'}
             </span>
-            {route.autoImport.enabled &&
-              (isRouteCompleted(route) ? (
-                <span className="route-auto-import route-completed">🏁 Completed - auto-import stopped</span>
-              ) : (
-                <span className="route-auto-import" title={`Importing workouts recorded since ${formatDateTime(route.autoImport.since)}`}>
-                  🔄 Auto-import: {route.autoImport.activities.join(', ')}
-                </span>
-              ))}
+            {completed && finishedOn && (
+              <span className="route-auto-import route-completed">Completed on {formatDate(finishedOn)}</span>
+            )}
+            {!completed && route.autoImport.enabled && (
+              <span className="route-auto-import" title={`Importing workouts recorded since ${formatDateTime(route.autoImport.since)}`}>
+                🔄 Auto-import: {route.autoImport.activities.join(', ')}
+              </span>
+            )}
           </span>
         </button>
 
@@ -104,6 +107,11 @@ const RouteListItem = memo(function RouteListItem({
               </button>
             </div>
           </div>
+          {!completed && (
+            <button type="button" className="import-past-btn" onClick={() => onImportPast(route.id)}>
+              Import past workouts
+            </button>
+          )}
 
           {isExpanded && (
             <ul className="expanded-workouts" id={workoutsId}>

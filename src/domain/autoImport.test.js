@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assignWorkoutsToRoutes,
   distributeImportedWorkouts,
   earliestImportStart,
+  completionDate,
   isRouteCompleted,
+  newlyCompletedRoutes,
   normalizeAutoImport,
   resolveAutoImport,
   validateAutoImport,
@@ -120,10 +123,14 @@ describe('distributeImportedWorkouts', () => {
     expect(externalIds(routes[0])).toEqual(['first', 'finisher']);
     expect(addedCount).toBe(2);
     expect(isRouteCompleted(routes[0])).toBe(true);
+    expect(completionDate(routes[0])).toBe('2025-03-03');
+    expect(completionDate({ ...routes[0], workouts: routes[0].workouts.slice(0, 1) })).toBeNull();
 
     const next = distributeImportedWorkouts(routes, [imported('Running', '2025-03-05T08:00:00.000Z', 'later')]);
     expect(next.addedCount).toBe(0);
     expect(next.routes[0]).toBe(routes[0]);
+    expect(newlyCompletedRoutes([route], routes).map((item) => item.id)).toEqual([route.id]);
+    expect(newlyCompletedRoutes(routes, next.routes)).toEqual([]);
   });
 
   it('is idempotent across syncs and distinguishes providers', () => {
@@ -136,6 +143,22 @@ describe('distributeImportedWorkouts', () => {
 
     const garmin = distributeImportedWorkouts(first.routes, [imported('Running', '2025-03-05T08:00:00.000Z', 1, { source: 'garmin' })]);
     expect(garmin.addedCount).toBe(1);
+  });
+
+  it('assigns a past workout to the chosen routes and keeps duplicates out', () => {
+    const route = makeRoute('R', ['Running'], { enabled: false, routeActivities: ['Running'] });
+    const other = makeRoute('Other', ['Cycling'], { enabled: false, routeActivities: ['Cycling'] });
+    const past = imported('Running', '2020-01-01T08:00:00.000Z', 'old');
+    const ride = imported('Cycling', '2020-01-02T08:00:00.000Z', 'ride');
+
+    const first = assignWorkoutsToRoutes([route, other], [past, ride], [route.id, other.id]);
+    expect(externalIds(first.routes[0])).toEqual(['old']);
+    expect(externalIds(first.routes[1])).toEqual(['ride']);
+    expect(first.addedCount).toBe(2);
+
+    const again = assignWorkoutsToRoutes(first.routes, [past], [route.id]);
+    expect(again.addedCount).toBe(0);
+    expect(again.routes[0]).toBe(first.routes[0]);
   });
 
   it('fetch window covers only routes still collecting imports', () => {

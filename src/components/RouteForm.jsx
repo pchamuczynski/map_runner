@@ -3,22 +3,20 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { ACTIVITIES } from '../domain/activities';
-import { DEFAULT_AUTO_IMPORT, isRouteCompleted } from '../domain/autoImport';
+import { isRouteCompleted } from '../domain/autoImport';
 import { DEFAULT_ROUTE_ACTIVITIES, ROUTE_LIMITS, createRoute, updateRoute, validateRouteInput } from '../domain/route';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useRouteCalculation } from '../hooks/useRouteCalculation';
-import { formatDateTime, formatDistance, formatDuration } from '../lib/format';
-import { enabledIntegrations } from '../services/integrations';
+import { formatDistance, formatDuration } from '../lib/format';
 import ActivityPicker from './ActivityPicker';
 import LocationAutocomplete from './LocationAutocomplete';
 import './RouteForm.css';
 
 const PROVIDER_LABELS = { google: 'Google Maps', osrm: 'OpenStreetMap (OSRM)' };
 
-const autoImportStatus = (route) => {
+const importHint = (route) => {
   if (route && isRouteCompleted(route)) return 'This route is completed, so no more workouts will be imported.';
-  if (route?.autoImport.enabled) return `Importing workouts recorded since ${formatDateTime(route.autoImport.since)}.`;
-  return 'Only workouts recorded after you save will be imported - past workouts are not.';
+  return "New workouts of this route's activities are added automatically. Use Import past workouts on the route to add older ones.";
 };
 
 /**
@@ -35,7 +33,11 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview }) => {
   const [from, setFrom] = useState(route?.from ?? '');
   const [to, setTo] = useState(route?.to ?? '');
   const [activities, setActivities] = useState(route?.activities ?? DEFAULT_ROUTE_ACTIVITIES);
-  const [autoImport, setAutoImport] = useState(route?.autoImport ?? DEFAULT_AUTO_IMPORT);
+  const [autoImport, setAutoImport] = useState(
+    route
+      ? { enabled: route.autoImport.enabled, activities: route.activities, since: route.autoImport.since }
+      : { enabled: true, activities: [...DEFAULT_ROUTE_ACTIVITIES], since: null },
+  );
   const [errors, setErrors] = useState({});
 
   const endpointsChanged = !isEdit || from.trim() !== route.from || to.trim() !== route.to;
@@ -61,29 +63,23 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview }) => {
   };
 
   const toggleActivity = (activity, checked) => {
-    setActivities((prev) => ACTIVITIES.filter((a) => (a === activity ? checked : prev.includes(a))));
-    setErrors((prev) => ({ ...prev, activities: undefined }));
-    // Auto-import can only import what the route allows.
-    if (!checked) changeAutoImport((prev) => ({ ...prev, activities: prev.activities.filter((a) => a !== activity) }));
+    const next = ACTIVITIES.filter((a) => (a === activity ? checked : activities.includes(a)));
+    setActivities(next);
+    setErrors((prev) => ({ ...prev, activities: undefined, autoImport: undefined }));
+    setAutoImport((prev) => (prev.enabled ? { ...prev, activities: next } : prev));
   };
 
-  const toggleAutoImport = (enabled) =>
-    changeAutoImport((prev) => ({
-      ...prev,
-      enabled,
-      // First time on: import everything the route counts.
-      activities: enabled && prev.activities.length === 0 ? activities : prev.activities,
-    }));
-
-  const toggleImportActivity = (activity, checked) =>
-    changeAutoImport((prev) => ({
-      ...prev,
-      activities: activities.filter((a) => (a === activity ? checked : prev.activities.includes(a))),
-    }));
+  const toggleAutoImport = (enabled) => changeAutoImport({ ...autoImport, enabled, activities: enabled ? activities : autoImport.activities });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const details = { name, from, to, activities, autoImport };
+    const details = {
+      name,
+      from,
+      to,
+      activities,
+      autoImport: { enabled: autoImport.enabled, activities: autoImport.enabled ? activities : [] },
+    };
     const validation = validateRouteInput(details);
     setErrors(validation);
     if (Object.keys(validation).length > 0 || !geometry) return;
@@ -152,28 +148,9 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview }) => {
           <legend className="visually-hidden">Automatic import</legend>
           <label className="checkbox-row">
             <input type="checkbox" checked={autoImport.enabled} onChange={(e) => toggleAutoImport(e.target.checked)} />
-            Automatically import workouts
+            Import new workouts
           </label>
-
-          {autoImport.enabled && (
-            <div className="auto-import-options">
-              {activities.length > 0 ? (
-                <ActivityPicker
-                  label="Workout types to import"
-                  options={activities}
-                  selected={autoImport.activities}
-                  onToggle={toggleImportActivity}
-                  invalid={Boolean(errors.autoImport)}
-                />
-              ) : (
-                <p className="field-hint">Select the route&apos;s activities first.</p>
-              )}
-              <p className="field-hint">{autoImportStatus(route)}</p>
-              {enabledIntegrations().length === 0 && (
-                <p className="field-hint">Takes effect once Strava or Garmin is connected.</p>
-              )}
-            </div>
-          )}
+          {autoImport.enabled && <p className="field-hint">{importHint(route)}</p>}
           {errors.autoImport && <p className="field-error">{errors.autoImport}</p>}
         </fieldset>
 

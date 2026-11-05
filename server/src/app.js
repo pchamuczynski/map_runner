@@ -8,16 +8,29 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { createGoogleVerifier } from './auth/google.js';
+import { createGarminClient } from './integrations/garmin.js';
+import { createPersonalGarminClient } from './integrations/garminPersonal.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 import { loadSession, requireUser } from './middleware/session.js';
 import { createRouteSetRepository } from './repositories/routeSets.js';
 import { createUserRepository } from './repositories/users.js';
 import { createAuthRouter } from './routes/auth.js';
+import { createGarminPushHandler, createIntegrationRouter } from './routes/integrations.js';
 import { createRouteSetRouter } from './routes/routeSets.js';
 import { csrfProtection } from './security/csrf.js';
 import { createSessionStore } from './security/sessions.js';
 
-export const createApp = ({ config, db, verifyGoogleCredential = createGoogleVerifier(config.googleClientId) }) => {
+const garminFromConfig = (garmin) =>
+  garmin?.consumerKey && garmin?.consumerSecret
+    ? createGarminClient(garmin)
+    : createPersonalGarminClient({ apiKey: garmin?.personalKey ?? '' });
+
+export const createApp = ({
+  config,
+  db,
+  verifyGoogleCredential = createGoogleVerifier(config.googleClientId),
+  garmin = garminFromConfig(config.garmin),
+}) => {
   const users = createUserRepository(db);
   const sessions = createSessionStore(db, { ttlMs: config.sessionTtlMs });
   const routeSets = createRouteSetRepository(db);
@@ -41,6 +54,8 @@ export const createApp = ({ config, db, verifyGoogleCredential = createGoogleVer
     next();
   });
   app.use(cookieParser());
+  // Garmin calls this itself, with no session cookie and no CSRF header.
+  app.post('/api/integrations/garmin/push', express.json({ limit: '2mb' }), createGarminPushHandler({ db, garmin }));
 
   const api = express.Router();
   api.use((_req, res, next) => {
@@ -51,6 +66,7 @@ export const createApp = ({ config, db, verifyGoogleCredential = createGoogleVer
   api.use(loadSession({ sessions, cookieName: config.cookie.name }));
   api.use('/auth', express.json({ limit: '10kb' }), createAuthRouter({ users, sessions, db, config, verifyGoogleCredential }));
   api.use('/routes', requireUser, express.json({ limit: '10mb' }), createRouteSetRouter({ routeSets }));
+  api.use('/integrations', createIntegrationRouter({ config, db, garmin }));
   api.use(notFound);
   app.use('/api', api);
 

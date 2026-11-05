@@ -1,0 +1,37 @@
+.import-past-dialog {
+  width: 420px;
+}
+
+.import-past-route {
+  margin-bottom: 12px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.import-past-types {
+  display: block;
+  color: #888;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.import-past-dates {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.import-past-dates label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.import-past-message {
+  margin-top: 12px;
+  color: #155724;
+}

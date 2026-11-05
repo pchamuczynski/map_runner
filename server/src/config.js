@@ -25,6 +25,11 @@ const schema = z.object({
   TRUST_PROXY: z.string().default(''),
   // Path to the built frontend (../dist) to serve it from this server in production.
   CLIENT_DIST: z.string().default(''),
+  // Garmin Health API consumer credentials from https://developerportal.garmin.com/
+  GARMIN_CONSUMER_KEY: z.string().trim().default(''),
+  GARMIN_CONSUMER_SECRET: z.string().trim().default(''),
+  // Personal API key. Reads only the key owner's data, used when the consumer pair is absent.
+  GARMIN_PERSONAL_KEY: z.string().trim().default(''),
 });
 
 export const loadConfig = (env = process.env) => {
@@ -45,6 +50,11 @@ export const loadConfig = (env = process.env) => {
     sessionTtlMs: values.SESSION_TTL_DAYS * 24 * 60 * 60 * 1000,
     trustProxy: values.TRUST_PROXY.trim(),
     clientDist: values.CLIENT_DIST.trim(),
+    garmin: Object.freeze({
+      consumerKey: values.GARMIN_CONSUMER_KEY,
+      consumerSecret: values.GARMIN_CONSUMER_SECRET,
+      personalKey: values.GARMIN_PERSONAL_KEY,
+    }),
     // Secure cookies require HTTPS; the __Host- prefix additionally pins the cookie to this exact host.
     cookie: Object.freeze({
       name: isProduction ? '__Host-mr_session' : 'mr_session',

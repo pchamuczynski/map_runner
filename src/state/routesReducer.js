@@ -2,8 +2,8 @@
  * Pure reducer for route/workout state. Every mutation goes through here, so each
  * user action produces exactly one consistent state update (and one save).
  */
-import { distributeImportedWorkouts } from '../domain/autoImport';
-import { withWorkouts } from '../domain/route';
+import { assignWorkoutsToRoutes, distributeImportedWorkouts } from '../domain/autoImport';
+import { updateRoute, withWorkouts } from '../domain/route';
 
 export const initialRoutesState = Object.freeze({
   status: 'loading', // 'loading' | 'ready' | 'error'
@@ -72,6 +72,32 @@ export const routesReducer = (state, action) => {
       const { routes, addedCount } = distributeImportedWorkouts(state.routes, action.workouts);
       return addedCount > 0 ? mutate(state, routes) : state;
     }
+    case 'WORKOUTS_ASSIGNED': {
+      const { routes, addedCount } = assignWorkoutsToRoutes(state.routes, action.workouts, action.routeIds);
+      return addedCount > 0 ? mutate(state, routes) : state;
+    }
+    case 'AUTO_IMPORT_SET': {
+      const selected = new Set(action.routeIds);
+      const now = action.now ?? new Date();
+      let changed = false;
+      const routes = state.routes.map((route) => {
+        const enabled = selected.has(route.id);
+        const next = updateRoute(
+          route,
+          { ...route, autoImport: { enabled, activities: enabled ? route.activities : route.autoImport.activities } },
+          route,
+          now,
+        );
+        const same =
+          next.autoImport.enabled === route.autoImport.enabled &&
+          next.autoImport.since === route.autoImport.since &&
+          next.autoImport.activities.join('\0') === route.autoImport.activities.join('\0');
+        if (same) return route;
+        changed = true;
+        return next;
+      });
+      return changed ? mutate(state, routes) : state;
+    }
 
     default:
       return state;
@@ -89,4 +115,8 @@ export const createRouteActions = (dispatch) => ({
   deleteWorkout: (routeId, workoutId) => dispatch({ type: 'WORKOUT_DELETED', routeId, workoutId }),
   /** Routes each imported workout to the routes whose auto-import settings accept it. */
   importWorkouts: (workouts) => dispatch({ type: 'WORKOUTS_IMPORTED', workouts }),
+  /** Adds workouts to the routes the user chose, ignoring the auto-import window. */
+  assignWorkouts: (workouts, routeIds) => dispatch({ type: 'WORKOUTS_ASSIGNED', workouts, routeIds }),
+  /** Turns automatic import on for the chosen routes and off for the others. */
+  setAutoImportRoutes: (routeIds) => dispatch({ type: 'AUTO_IMPORT_SET', routeIds }),
 });

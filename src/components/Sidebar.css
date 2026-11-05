@@ -35,6 +35,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .sidebar-empty {
@@ -69,8 +70,39 @@
   list-style: none;
   margin: 10px 0 0;
   padding: 0 8px 0 0;
-  flex: 1;
-  overflow-y: auto;
+}
+
+.route-section {
+  margin-top: 12px;
+}
+
+.route-section h3 {
+  margin: 0;
+}
+
+.route-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: #555;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-align: left;
+}
+
+.route-section-toggle:hover {
+  color: #1976d2;
+}
+
+.route-section-count {
+  margin-left: auto;
+  color: #888;
+  font-weight: 500;
 }
 
 .routes-list::-webkit-scrollbar {
@@ -271,6 +303,22 @@
 .add-workout-mini-btn:hover {
   background-color: #2196f3;
   color: white;
+}
+
+.import-past-btn {
+  display: block;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #1976d2;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.import-past-btn:hover {
+  text-decoration: underline;
 }
 
 .expanded-workouts {

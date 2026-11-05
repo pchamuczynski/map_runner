@@ -37,6 +37,35 @@ const MIGRATIONS = [
     updated_at TEXT NOT NULL
   );
   `,
+  // 2: connected providers (Garmin OAuth tokens) and activities Garmin has pushed
+  `
+  CREATE TABLE integrations (
+    user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider     TEXT NOT NULL,
+    token        TEXT NOT NULL,
+    token_secret TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, provider)
+  );
+  CREATE INDEX integrations_token ON integrations(provider, token);
+
+  CREATE TABLE oauth_requests (
+    token        TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider     TEXT NOT NULL,
+    token_secret TEXT NOT NULL,
+    created_at   TEXT NOT NULL
+  );
+
+  CREATE TABLE garmin_activities (
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    external_id TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    started_at  TEXT NOT NULL,
+    PRIMARY KEY (user_id, external_id)
+  );
+  `,
 ];
 
 /** Runs `fn` atomically; rolls back if it throws. */

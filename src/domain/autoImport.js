@@ -63,6 +63,23 @@ export const validateAutoImport = (settings) => {
 
 export const isRouteCompleted = (route) => route.distance > 0 && totalDistance(route.workouts) >= route.distance;
 
+/** Calendar date of the workout that crosses the finish line, or null while the route is unfinished. */
+export const completionDate = (route) => {
+  if (!isRouteCompleted(route)) return null;
+  let covered = 0;
+  for (const workout of sortWorkoutsByDate(route.workouts)) {
+    covered += workout.distance;
+    if (covered >= route.distance) return workout.date;
+  }
+  return null;
+};
+
+/** Routes that existed and were unfinished, and are finished now. */
+export const newlyCompletedRoutes = (previous, next) => {
+  const wasCompleted = new Map(previous.map((route) => [route.id, isRouteCompleted(route)]));
+  return next.filter((route) => isRouteCompleted(route) && wasCompleted.get(route.id) === false);
+};
+
 /** Whether the route is currently collecting imports. */
 export const isAutoImportActive = (route) => route.autoImport?.enabled === true && !isRouteCompleted(route);
 
@@ -83,6 +100,26 @@ const chronological = (a, b) =>
   (a.startedAt ?? a.date).localeCompare(b.startedAt ?? b.date) || a.createdAt.localeCompare(b.createdAt);
 
 /**
+ * Adds eligible workouts in the order they happened, stopping once the route is
+ * complete. Already imported workouts are skipped. An unchanged route keeps its identity.
+ */
+const acceptUntilComplete = (route, eligible) => {
+  const { added } = mergeImportedWorkouts(route.workouts, eligible);
+  let covered = totalDistance(route.workouts);
+  const accepted = [];
+  for (const workout of [...added].sort(chronological)) {
+    if (covered >= route.distance) break;
+    accepted.push(workout);
+    covered += workout.distance;
+  }
+  if (accepted.length === 0) return { route, added: 0 };
+  return {
+    route: { ...route, workouts: sortWorkoutsByDate([...route.workouts, ...accepted]) },
+    added: accepted.length,
+  };
+};
+
+/**
  * Adds each imported workout to every route whose auto-import settings accept it.
  * Workouts are applied in the order they happened and a route stops accepting them
  * once it is completed. Already imported workouts (same source + externalId) are
@@ -95,19 +132,31 @@ export const distributeImportedWorkouts = (routes, workouts) => {
   const updated = routes.map((route) => {
     const eligible = workouts.filter((workout) => routeAcceptsWorkout(route, workout));
     if (eligible.length === 0) return route;
+    const result = acceptUntilComplete(route, eligible);
+    addedCount += result.added;
+    return result.route;
+  });
+  return { routes: updated, addedCount };
+};
 
-    const { added } = mergeImportedWorkouts(route.workouts, eligible);
-    let covered = totalDistance(route.workouts);
-    const accepted = [];
-    for (const workout of [...added].sort(chronological)) {
-      if (covered >= route.distance) break;
-      accepted.push(workout);
-      covered += workout.distance;
-    }
-    if (accepted.length === 0) return route;
-
-    addedCount += accepted.length;
-    return { ...route, workouts: sortWorkoutsByDate([...route.workouts, ...accepted]) };
+/**
+ * Puts workouts onto the routes the user picked (a historical import). Matches the
+ * route's own activity types and ignores the auto-import window. Same de-duplication
+ * and completion rules as automatic import.
+ *
+ * @param {string[]} routeIds
+ * @returns {{ routes: import('./route').Route[], addedCount: number }}
+ */
+export const assignWorkoutsToRoutes = (routes, workouts, routeIds) => {
+  const selected = new Set(routeIds);
+  let addedCount = 0;
+  const updated = routes.map((route) => {
+    if (!selected.has(route.id)) return route;
+    const eligible = workouts.filter((workout) => route.activities.includes(workout.activity));
+    if (eligible.length === 0) return route;
+    const result = acceptUntilComplete(route, eligible);
+    addedCount += result.added;
+    return result.route;
   });
   return { routes: updated, addedCount };
 };
