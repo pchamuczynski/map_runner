@@ -7,6 +7,8 @@ import RouteForm from '../components/RouteForm';
 import Sidebar from '../components/Sidebar';
 import WorkoutForm from '../components/WorkoutForm';
 import { assignWorkoutsToRoutes, newlyCompletedRoutes } from '../domain/autoImport';
+import { describeImportResult } from '../domain/overlap';
+import { readOverlapPolicy, subscribeOverlapPolicy, writeOverlapPolicy } from '../domain/overlapPolicy';
 import { useAuth, useConfirm, useRoutes } from '../state/contexts';
 import './HomePage.css';
 
@@ -17,6 +19,19 @@ import './HomePage.css';
  *   | { type: 'addWorkout', routeId: string }
  *   | { type: 'editWorkout', routeId: string, workoutId: string }} Dialog
  */
+
+const SIDEBAR_WIDTH = { min: 240, max: 640, fallback: 290 };
+const SIDEBAR_WIDTH_KEY = 'mapRunner:v2:sidebar-width';
+
+const readSidebarWidth = () => {
+  try {
+    const value = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    if (value >= SIDEBAR_WIDTH.min && value <= SIDEBAR_WIDTH.max) return value;
+  } catch {
+    // Storage can be blocked; the default width still works.
+  }
+  return SIDEBAR_WIDTH.fallback;
+};
 
 const completionMessage = (finished) => {
   const names = finished.map((route) => route.name);
@@ -35,8 +50,11 @@ const HomePage = () => {
   const [garminDialog, setGarminDialog] = useState(null);
   const [importRouteId, setImportRouteId] = useState(null);
   const [completedNotice, setCompletedNotice] = useState([]);
+  const [importNotice, setImportNotice] = useState('');
+  const [overlapPolicy, setOverlapPolicy] = useState(readOverlapPolicy);
   const seenRoutes = useRef(null);
   const [connectionVersion, setConnectionVersion] = useState(0);
+  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
 
   const selectedRoute = routes.find((route) => route.id === selectedRouteId) ?? null;
   const importRoute = routes.find((route) => route.id === importRouteId) ?? null;
@@ -61,6 +79,23 @@ const HomePage = () => {
     const finished = newlyCompletedRoutes(previous, routes);
     if (finished.length > 0) setCompletedNotice(finished);
   }, [routes, status]);
+
+  useEffect(() => subscribeOverlapPolicy(setOverlapPolicy), []);
+
+  const chooseOverlapPolicy = useCallback((policy) => writeOverlapPolicy(policy), []);
+
+  const reportImport = useCallback((result, policy, name) => {
+    const text = describeImportResult({
+      added: result.addedCount,
+      filled: result.filledCount,
+      overlaps: result.overlapCount,
+      removed: result.removedCount,
+      policy,
+      name,
+    });
+    setImportNotice(text);
+    return text;
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -99,6 +134,25 @@ const HomePage = () => {
     [actions, confirm],
   );
 
+  const handleDeleteWorkouts = useCallback(
+    async (routeId, workoutIds, anchor) => {
+      const count = workoutIds.length;
+      const message = count === 1 ? 'Delete this workout?' : `Delete ${count} workouts?`;
+      if (await confirm({ anchor, message, confirmLabel: 'Delete selected' })) actions.deleteWorkouts(routeId, workoutIds);
+    },
+    [actions, confirm],
+  );
+
+  const handleSidebarWidth = useCallback((width) => {
+    const next = Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, Math.round(width)));
+    setSidebarWidth(next);
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next));
+    } catch {
+      // The new width still applies for this visit.
+    }
+  }, []);
+
   const handleRouteSubmit = (route) => {
     if (dialog.type === 'createRoute') actions.addRoute(route);
     else actions.updateRoute(route);
@@ -113,8 +167,10 @@ const HomePage = () => {
   };
 
   return (
-    <div className="home-page">
+    <div className="home-page" style={{ '--sidebar-width': `${sidebarWidth}px` }}>
       <Sidebar
+        width={sidebarWidth}
+        onWidthChange={handleSidebarWidth}
         routes={routes}
         status={status}
         selectedRouteId={selectedRouteId}
@@ -124,24 +180,25 @@ const HomePage = () => {
         onDeleteRoute={handleDeleteRoute}
         onMoveRoute={actions.moveRoute}
         onAddWorkout={handleAddWorkout}
-        onImportPast={setImportRouteId}
         onEditWorkout={handleEditWorkout}
         onDeleteWorkout={handleDeleteWorkout}
+        onDeleteWorkouts={handleDeleteWorkouts}
       />
 
       <main className="map-area">
-        <header className="map-header">
-          <h1>Map Runner v2</h1>
-          <AccountMenu
-            connectionVersion={connectionVersion}
-            onManageIntegration={(id) => id === 'garmin' && setGarminDialog({ notice: '' })}
-          />
-        </header>
 
         {completedNotice.length > 0 && (
           <div className="page-alert alert alert-success completion-notice" role="status">
             <span className="page-alert-text">{completionMessage(completedNotice)}</span>
             <button type="button" className="close-btn" onClick={() => setCompletedNotice([])} aria-label="Dismiss">
+              ×
+            </button>
+          </div>
+        )}
+        {importNotice && (
+          <div className="page-alert alert alert-info" role="status">
+            <span className="page-alert-text">{importNotice}</span>
+            <button type="button" className="close-btn" onClick={() => setImportNotice('')} aria-label="Dismiss">
               ×
             </button>
           </div>
@@ -167,6 +224,14 @@ const HomePage = () => {
 
         <div className="map-stage">
           <RouteMap route={preview ?? selectedRoute} />
+          <div className="map-account">
+            <AccountMenu
+              connectionVersion={connectionVersion}
+              overlapPolicy={overlapPolicy}
+              onOverlapPolicy={chooseOverlapPolicy}
+              onManageIntegration={(id) => id === 'garmin' && setGarminDialog({ notice: '' })}
+            />
+          </div>
           {showRouteForm && (
             <RouteForm
               key={dialog.routeId ?? 'new'}
@@ -174,6 +239,7 @@ const HomePage = () => {
               onSubmit={handleRouteSubmit}
               onCancel={closeDialog}
               onPreview={setPreview}
+              onImportPast={setImportRouteId}
             />
           )}
         </div>
@@ -182,11 +248,13 @@ const HomePage = () => {
       {importRoute && (
         <ImportPastDialog
           route={importRoute}
+          policy={overlapPolicy}
+          onPolicy={chooseOverlapPolicy}
           onClose={() => setImportRouteId(null)}
-          onImported={(workouts) => {
-            const { addedCount } = assignWorkoutsToRoutes(routes, workouts, [importRoute.id]);
-            actions.assignWorkouts(workouts, [importRoute.id]);
-            return addedCount;
+          onImported={(workouts, policy) => {
+            const result = assignWorkoutsToRoutes(routes, workouts, [importRoute.id], policy);
+            actions.assignWorkouts(workouts, [importRoute.id], policy);
+            reportImport(result, policy, importRoute.name);
           }}
         />
       )}
@@ -195,12 +263,14 @@ const HomePage = () => {
         <GarminDialog
           routes={routes}
           notice={garminDialog.notice}
+          policy={overlapPolicy}
+          onPolicy={chooseOverlapPolicy}
           onClose={() => setGarminDialog(null)}
           onSaveRoutes={actions.setAutoImportRoutes}
-          onImported={(workouts, routeIds) => {
-            const { addedCount } = assignWorkoutsToRoutes(routes, workouts, routeIds);
-            actions.assignWorkouts(workouts, routeIds);
-            return addedCount;
+          onImported={(workouts, routeIds, policy) => {
+            const result = assignWorkoutsToRoutes(routes, workouts, routeIds, policy);
+            actions.assignWorkouts(workouts, routeIds, policy);
+            return reportImport(result, policy, '');
           }}
           onDisconnected={() => {
             setGarminDialog(null);

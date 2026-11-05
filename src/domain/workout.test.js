@@ -46,5 +46,17 @@ describe('workout helpers', () => {
     const second = mergeImportedWorkouts(first.workouts, [again]);
     expect(second.added).toHaveLength(0);
     expect(second.workouts).toHaveLength(2);
+    expect(second.filled).toBe(false);
+    expect(second.workouts).toBe(first.workouts);
+  });
+
+  it('fills elapsed time onto a workout that was imported before duration was stored', () => {
+    const imported = createWorkout({ date: '2025-01-03', activity: 'Running', distance: 5000, source: 'garmin', externalId: '7' });
+    const withTime = createWorkout({ date: '2025-01-03', activity: 'Running', distance: 5000, duration: 1830, source: 'garmin', externalId: '7' });
+    const merged = mergeImportedWorkouts([imported], [withTime]);
+    expect(merged.added).toHaveLength(0);
+    expect(merged.filled).toBe(true);
+    expect(merged.workouts[0].duration).toBe(1830);
+    expect(merged.workouts[0].id).toBe(imported.id);
   });
 });

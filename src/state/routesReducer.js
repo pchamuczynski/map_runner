@@ -15,6 +15,9 @@ export const initialRoutesState = Object.freeze({
 
 const mutate = (state, routes) => ({ ...state, routes, revision: state.revision + 1 });
 
+const replaceIfChanged = (state, routes) =>
+  routes.some((route, index) => route !== state.routes[index]) ? mutate(state, routes) : state;
+
 const updateRouteById = (state, routeId, update) => {
   let changed = false;
   const routes = state.routes.map((route) => {
@@ -68,14 +71,19 @@ export const routesReducer = (state, action) => {
           route.workouts.filter((w) => w.id !== action.workoutId),
         ),
       );
-    case 'WORKOUTS_IMPORTED': {
-      const { routes, addedCount } = distributeImportedWorkouts(state.routes, action.workouts);
-      return addedCount > 0 ? mutate(state, routes) : state;
+    case 'WORKOUTS_DELETED': {
+      const ids = new Set(action.workoutIds);
+      return updateRouteById(state, action.routeId, (route) =>
+        withWorkouts(
+          route,
+          route.workouts.filter((w) => !ids.has(w.id)),
+        ),
+      );
     }
-    case 'WORKOUTS_ASSIGNED': {
-      const { routes, addedCount } = assignWorkoutsToRoutes(state.routes, action.workouts, action.routeIds);
-      return addedCount > 0 ? mutate(state, routes) : state;
-    }
+    case 'WORKOUTS_IMPORTED':
+      return replaceIfChanged(state, distributeImportedWorkouts(state.routes, action.workouts, action.policy).routes);
+    case 'WORKOUTS_ASSIGNED':
+      return replaceIfChanged(state, assignWorkoutsToRoutes(state.routes, action.workouts, action.routeIds, action.policy).routes);
     case 'AUTO_IMPORT_SET': {
       const selected = new Set(action.routeIds);
       const now = action.now ?? new Date();
@@ -113,10 +121,11 @@ export const createRouteActions = (dispatch) => ({
   addWorkout: (routeId, workout) => dispatch({ type: 'WORKOUT_ADDED', routeId, workout }),
   updateWorkout: (routeId, workout) => dispatch({ type: 'WORKOUT_UPDATED', routeId, workout }),
   deleteWorkout: (routeId, workoutId) => dispatch({ type: 'WORKOUT_DELETED', routeId, workoutId }),
+  deleteWorkouts: (routeId, workoutIds) => dispatch({ type: 'WORKOUTS_DELETED', routeId, workoutIds }),
   /** Routes each imported workout to the routes whose auto-import settings accept it. */
-  importWorkouts: (workouts) => dispatch({ type: 'WORKOUTS_IMPORTED', workouts }),
+  importWorkouts: (workouts, policy) => dispatch({ type: 'WORKOUTS_IMPORTED', workouts, policy }),
   /** Adds workouts to the routes the user chose, ignoring the auto-import window. */
-  assignWorkouts: (workouts, routeIds) => dispatch({ type: 'WORKOUTS_ASSIGNED', workouts, routeIds }),
+  assignWorkouts: (workouts, routeIds, policy) => dispatch({ type: 'WORKOUTS_ASSIGNED', workouts, routeIds, policy }),
   /** Turns automatic import on for the chosen routes and off for the others. */
   setAutoImportRoutes: (routeIds) => dispatch({ type: 'AUTO_IMPORT_SET', routeIds }),
 });

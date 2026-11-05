@@ -1,4 +1,6 @@
 .workout-check {
+  display: block;
+  height: auto;
   margin: 12px 0;
 }
 
@@ -9,22 +11,18 @@
   margin-bottom: 6px;
 }
 
-.workout-check-action {
-  padding: 0;
-  border: none;
-  background: none;
-  color: #1976d2;
+.workout-check .workout-select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
-}
-
-.workout-check-action:disabled {
-  color: #aaa;
-  cursor: default;
+  color: #333;
+  cursor: pointer;
 }
 
 .workout-check-count {
-  margin-left: auto;
   color: #888;
   font-size: 12px;
 }
@@ -33,8 +31,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 240px;
-  overflow-y: auto;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
 }
@@ -57,11 +53,17 @@
 
 .workout-check-main {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   min-width: 0;
   font-size: 13px;
+}
+
+.workout-check-activity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .workout-check-date,

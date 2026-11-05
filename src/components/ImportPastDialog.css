@@ -1,5 +1,12 @@
-.import-past-dialog {
-  width: 420px;
+.dialog.import-past-dialog {
+  width: min(560px, 92vw);
+  max-height: min(900px, 94vh);
+}
+
+.import-past-dialog .btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
 }
 
 .import-past-route {
@@ -14,21 +21,6 @@
   color: #888;
   font-size: 12px;
   font-weight: 400;
-}
-
-.import-past-dates {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.import-past-dates label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  font-size: 13px;
-  font-weight: 500;
 }
 
 .import-past-message {

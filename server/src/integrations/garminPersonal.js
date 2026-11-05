@@ -60,10 +60,12 @@ export const toHealthSummary = (activity) => {
   const local = parseClock(activity?.startTimeLocal);
   if (activity?.activityId == null || !activityType || start == null) return null;
   const distance = Number(activity.distanceInMeters ?? activity.distance);
+  const elapsed = [activity.elapsedDuration, activity.durationInSeconds, activity.duration].map(Number).find((value) => value > 0);
   return {
     activityId: activity.activityId,
     activityType,
     distanceInMeters: Number.isFinite(distance) ? distance : 0,
+    durationInSeconds: Number.isFinite(elapsed) ? elapsed : 0,
     startTimeInSeconds: start,
     startTimeOffsetInSeconds: local == null ? Number(activity.startTimeOffsetInSeconds) || 0 : local - start,
   };

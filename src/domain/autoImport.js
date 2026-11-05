@@ -15,6 +15,7 @@
  * @property {string | null} since    ISO timestamp of when auto-import was switched on; null while off.
  */
 import { ACTIVITIES, normalizeActivities } from './activities.js';
+import { intervalsOverlap, workoutInterval } from './overlap.js';
 import { mergeImportedWorkouts, sortWorkoutsByDate, totalDistance } from './workout.js';
 
 export const DEFAULT_AUTO_IMPORT = Object.freeze({ enabled: false, activities: [], since: null });
@@ -99,23 +100,69 @@ export const routeAcceptsWorkout = (route, workout) =>
 const chronological = (a, b) =>
   (a.startedAt ?? a.date).localeCompare(b.startedAt ?? b.date) || a.createdAt.localeCompare(b.createdAt);
 
+const conflictsWith = (workout, others) => {
+  const incoming = workoutInterval(workout);
+  if (!incoming) return [];
+  return others.filter((existing) => {
+    const interval = workoutInterval(existing);
+    return interval && intervalsOverlap(incoming, interval);
+  });
+};
+
 /**
  * Adds eligible workouts in the order they happened, stopping once the route is
- * complete. Already imported workouts are skipped. An unchanged route keeps its identity.
+ * complete. Already imported workouts are skipped. A repeat import can fill in
+ * elapsed time. Workouts that overlap in time follow `policy`:
+ * `old` keeps the one already on the route, `new` replaces it, `both` keeps each.
+ * An unchanged route keeps its identity.
  */
-const acceptUntilComplete = (route, eligible) => {
-  const { added } = mergeImportedWorkouts(route.workouts, eligible);
-  let covered = totalDistance(route.workouts);
+const acceptUntilComplete = (route, eligible, policy = 'both') => {
+  const merged = mergeImportedWorkouts(route.workouts, eligible);
+  const previousById = new Map(route.workouts.map((workout) => [workout.id, workout]));
+  let workouts = merged.workouts.filter((workout) => !merged.added.includes(workout));
+  let overlapCount = 0;
+  let removedCount = 0;
   const accepted = [];
-  for (const workout of [...added].sort(chronological)) {
+  let covered = totalDistance(workouts);
+
+  for (const workout of [...merged.added].sort(chronological)) {
+    const conflicting = conflictsWith(workout, workouts);
+    if (conflicting.length > 0 && policy === 'old') {
+      if (covered >= route.distance) break;
+      overlapCount += 1;
+      continue;
+    }
+    if (conflicting.length > 0 && policy === 'new') {
+      const remove = new Set(conflicting);
+      workouts = workouts.filter((existing) => !remove.has(existing));
+      removedCount += conflicting.length;
+      covered = totalDistance(workouts);
+      overlapCount += 1;
+      accepted.push(workout);
+      workouts.push(workout);
+      covered += workout.distance;
+      continue;
+    }
     if (covered >= route.distance) break;
+    if (conflicting.length > 0) overlapCount += 1;
     accepted.push(workout);
+    workouts.push(workout);
     covered += workout.distance;
   }
-  if (accepted.length === 0) return { route, added: 0 };
+
+  const filledCount = workouts.reduce((count, workout) => {
+    const previous = previousById.get(workout.id);
+    return count + (previous && !(previous.duration > 0) && workout.duration > 0 ? 1 : 0);
+  }, 0);
+  if (accepted.length === 0 && filledCount === 0 && removedCount === 0) {
+    return { route, added: 0, filled: 0, overlaps: overlapCount, removed: 0 };
+  }
   return {
-    route: { ...route, workouts: sortWorkoutsByDate([...route.workouts, ...accepted]) },
+    route: { ...route, workouts: sortWorkoutsByDate(workouts) },
     added: accepted.length,
+    filled: filledCount,
+    overlaps: overlapCount,
+    removed: removedCount,
   };
 };
 
@@ -125,18 +172,25 @@ const acceptUntilComplete = (route, eligible) => {
  * once it is completed. Already imported workouts (same source + externalId) are
  * skipped, so syncing is idempotent. Unchanged routes keep their identity.
  *
- * @returns {{ routes: import('./route').Route[], addedCount: number }}
+ * @param {'old' | 'new' | 'both'} [policy]
+ * @returns {{ routes: import('./route').Route[], addedCount: number, filledCount: number, overlapCount: number, removedCount: number }}
  */
-export const distributeImportedWorkouts = (routes, workouts) => {
+export const distributeImportedWorkouts = (routes, workouts, policy = 'both') => {
   let addedCount = 0;
+  let filledCount = 0;
+  let overlapCount = 0;
+  let removedCount = 0;
   const updated = routes.map((route) => {
     const eligible = workouts.filter((workout) => routeAcceptsWorkout(route, workout));
     if (eligible.length === 0) return route;
-    const result = acceptUntilComplete(route, eligible);
+    const result = acceptUntilComplete(route, eligible, policy);
     addedCount += result.added;
+    filledCount += result.filled;
+    overlapCount += result.overlaps;
+    removedCount += result.removed;
     return result.route;
   });
-  return { routes: updated, addedCount };
+  return { routes: updated, addedCount, filledCount, overlapCount, removedCount };
 };
 
 /**
@@ -145,20 +199,27 @@ export const distributeImportedWorkouts = (routes, workouts) => {
  * and completion rules as automatic import.
  *
  * @param {string[]} routeIds
- * @returns {{ routes: import('./route').Route[], addedCount: number }}
+ * @param {'old' | 'new' | 'both'} [policy]
+ * @returns {{ routes: import('./route').Route[], addedCount: number, filledCount: number, overlapCount: number, removedCount: number }}
  */
-export const assignWorkoutsToRoutes = (routes, workouts, routeIds) => {
+export const assignWorkoutsToRoutes = (routes, workouts, routeIds, policy = 'both') => {
   const selected = new Set(routeIds);
   let addedCount = 0;
+  let filledCount = 0;
+  let overlapCount = 0;
+  let removedCount = 0;
   const updated = routes.map((route) => {
     if (!selected.has(route.id)) return route;
     const eligible = workouts.filter((workout) => route.activities.includes(workout.activity));
     if (eligible.length === 0) return route;
-    const result = acceptUntilComplete(route, eligible);
+    const result = acceptUntilComplete(route, eligible, policy);
     addedCount += result.added;
+    filledCount += result.filled;
+    overlapCount += result.overlaps;
+    removedCount += result.removed;
     return result.route;
   });
-  return { routes: updated, addedCount };
+  return { routes: updated, addedCount, filledCount, overlapCount, removedCount };
 };
 
 /** Earliest `since` across routes still collecting imports, or null when none are. */

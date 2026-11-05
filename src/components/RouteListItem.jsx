@@ -1,7 +1,8 @@
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { completionDate, isRouteCompleted } from '../domain/autoImport';
 import { getCoveredDistance, getProgress } from '../domain/route';
-import { formatDate, formatDateTime, formatDistance, formatPercent, placeCity } from '../lib/format';
+import { totalWorkoutDuration } from '../domain/workout';
+import { formatDate, formatDateTime, formatDistance, formatDuration, formatPercent, placeCity } from '../lib/format';
 import ActivityIcon from './ActivityIcon';
 
 const RouteListItem = memo(function RouteListItem({
@@ -9,14 +10,15 @@ const RouteListItem = memo(function RouteListItem({
   isSelected,
   isExpanded,
   isDragging,
+  dropPlacement,
   onSelect,
   onToggleExpanded,
   onEdit,
   onDelete,
   onAddWorkout,
-  onImportPast,
   onEditWorkout,
   onDeleteWorkout,
+  onDeleteWorkouts,
   dragHandlers,
 }) {
   const progress = getProgress(route);
@@ -25,10 +27,27 @@ const RouteListItem = memo(function RouteListItem({
   const completed = isRouteCompleted(route);
   const finishedOn = completionDate(route);
   const [folded, setFolded] = useState(completed);
+  const [checkedIds, setCheckedIds] = useState(() => new Set());
+  const checked = route.workouts.filter((workout) => checkedIds.has(workout.id));
+  const allChecked = route.workouts.length > 0 && checked.length === route.workouts.length;
+  const selectAllRef = useRef(null);
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = checked.length > 0 && !allChecked;
+  }, [checked.length, allChecked]);
+
+  const toggleChecked = (workoutId) => {
+    setCheckedIds((current) => {
+      const next = new Set(current);
+      if (next.has(workoutId)) next.delete(workoutId);
+      else next.add(workoutId);
+      return next;
+    });
+  };
 
   return (
     <li
-      className={`route-item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
+      className={`route-item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${dropPlacement ? `drop-${dropPlacement}` : ''}`}
       draggable
       onDragStart={(e) => dragHandlers.onDragStart(e, route.id)}
       onDragEnd={dragHandlers.onDragEnd}
@@ -105,6 +124,10 @@ const RouteListItem = memo(function RouteListItem({
           <div className="route-stats-row">
             <span className="workout-count-mini">
               {workoutCount} workout{workoutCount !== 1 ? 's' : ''}
+              <span className="workout-time-mini" title="Total time elapsed on workouts">
+                {' '}
+                · {formatDuration(totalWorkoutDuration(route.workouts))}
+              </span>
             </span>
             <span className="progress-percentage">
               {formatDistance(getCoveredDistance(route))} ({formatPercent(progress)})
@@ -131,20 +154,37 @@ const RouteListItem = memo(function RouteListItem({
               </button>
             </div>
           </div>
-          {!completed && (
-            <button type="button" className="import-past-btn" onClick={() => onImportPast(route.id)}>
-              Import past workouts
-            </button>
+          {isExpanded && workoutCount > 0 && (
+            <label className="workout-select-all">
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={allChecked}
+                onChange={() => setCheckedIds(allChecked ? new Set() : new Set(route.workouts.map((workout) => workout.id)))}
+              />
+              Select all
+            </label>
           )}
-
           {isExpanded && (
             <ul className="expanded-workouts" id={workoutsId}>
               {workoutCount > 0 ? (
                 route.workouts.map((workout) => (
                   <li key={workout.id} className="workout-text-item">
-                    <span className="workout-text-info">
-                      <ActivityIcon activity={workout.activity} size={12} />
-                      <strong>{workout.activity}</strong> {formatDistance(workout.distance)} • {formatDate(workout.date)}
+                    <label className="workout-row-check">
+                      <input
+                        type="checkbox"
+                        checked={checkedIds.has(workout.id)}
+                        onChange={() => toggleChecked(workout.id)}
+                        aria-label={`Select ${workout.activity} on ${formatDate(workout.date)}`}
+                      />
+                    </label>
+                    <span className="workout-text-body">
+                      <span className="workout-date">{formatDate(workout.date)}</span>
+                      <span className="workout-text-info">
+                        <ActivityIcon activity={workout.activity} size={14} />
+                        <strong>{workout.activity}</strong>
+                        <span className="workout-distance">{formatDistance(workout.distance)}</span>
+                      </span>
                     </span>
                     <span className="item-actions">
                       <button
@@ -170,6 +210,15 @@ const RouteListItem = memo(function RouteListItem({
                 <li className="no-workouts">No workouts recorded yet</li>
               )}
             </ul>
+          )}
+          {isExpanded && checked.length > 0 && (
+            <button
+              type="button"
+              className="delete-workouts-btn"
+              onClick={(event) => onDeleteWorkouts(route.id, checked.map((workout) => workout.id), event.currentTarget)}
+            >
+              Delete selected
+            </button>
           )}
         </div>}
       </div>

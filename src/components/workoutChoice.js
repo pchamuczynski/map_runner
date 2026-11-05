@@ -1,6 +1,33 @@
+import { ACTIVITIES, LEGACY_OTHER_ACTIVITY } from '../domain/activities';
+
 /** Identity used to select a workout and to tell that it was already imported. */
 export const workoutKey = (workout) =>
   workout.externalId == null ? `id:${workout.id}` : `${workout.source}:${workout.externalId}`;
+
+/** Activity types present in a workout list, in the app's usual order. */
+export const activityTypesIn = (workouts) => {
+  const present = new Set(workouts.map((workout) => workout.activity));
+  const types = ACTIVITIES.filter((activity) => present.has(activity));
+  if (present.has(LEGACY_OTHER_ACTIVITY)) types.push(LEGACY_OTHER_ACTIVITY);
+  return types;
+};
+
+/** Workouts whose activity is one of the selected types. */
+export const workoutsOfTypes = (workouts, activities) => {
+  const allowed = activities instanceof Set ? activities : new Set(activities);
+  return workouts.filter((workout) => allowed.has(workout.activity));
+};
+
+/** Checks or unchecks one group of workouts without touching the rest of the selection. */
+export const withKeysChecked = (selected, workouts, checked) => {
+  const next = new Set(selected);
+  for (const workout of workouts) {
+    const key = workoutKey(workout);
+    if (checked) next.add(key);
+    else next.delete(key);
+  }
+  return next;
+};
 
 /** Newest first, limited to the date range and the activity types that can be imported. */
 export const workoutsInPeriod = (workouts, { from, to, activities }) => {

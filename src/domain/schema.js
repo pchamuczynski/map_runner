@@ -7,7 +7,7 @@ import { isValidCoordinate } from '../lib/geo.js';
 import { isWorkoutActivity, normalizeActivities } from './activities.js';
 import { normalizeAutoImport } from './autoImport.js';
 import { ROUTE_LIMITS, cleanText } from './route.js';
-import { WORKOUT_LIMITS, WORKOUT_SOURCES, isValidIsoDate, sortWorkoutsByDate } from './workout.js';
+import { WORKOUT_LIMITS, WORKOUT_SOURCES, durationSeconds, isValidIsoDate, sortWorkoutsByDate } from './workout.js';
 
 const SOURCES = new Set(Object.values(WORKOUT_SOURCES));
 
@@ -41,6 +41,7 @@ export const sanitizeWorkout = (raw) => {
     date: raw.date,
     activity: raw.activity,
     distance,
+    duration: durationSeconds(raw.duration),
     source: SOURCES.has(raw.source) ? raw.source : WORKOUT_SOURCES.MANUAL,
     externalId: raw.externalId == null ? null : toId(raw.externalId),
     startedAt: raw.startedAt == null ? null : toIsoTimestamp(raw.startedAt, null),

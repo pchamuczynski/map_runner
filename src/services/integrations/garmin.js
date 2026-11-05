@@ -44,6 +44,7 @@ export const mapGarminActivity = (summary) => {
     date: new Date((start + offset) * 1000).toISOString().slice(0, 10),
     activity: kind,
     distance,
+    duration: summary.durationInSeconds,
     source: WORKOUT_SOURCES.GARMIN,
     externalId,
     startedAt: new Date(start * 1000).toISOString(),

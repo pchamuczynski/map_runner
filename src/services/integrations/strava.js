@@ -33,6 +33,7 @@ export const mapStravaActivity = (activity) => {
     date: activity.start_date_local.slice(0, 10),
     activity: kind,
     distance,
+    duration: activity.elapsed_time,
     source: WORKOUT_SOURCES.STRAVA,
     externalId: activity.id,
     startedAt: Number.isFinite(startedAt) ? new Date(startedAt).toISOString() : null,

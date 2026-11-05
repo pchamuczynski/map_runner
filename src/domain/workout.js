@@ -7,6 +7,7 @@
  * @property {string} date         Local calendar date, `YYYY-MM-DD`.
  * @property {string} activity     One of ACTIVITIES (legacy workouts may be 'Other').
  * @property {number} distance     Meters, > 0.
+ * @property {number | null} duration  Elapsed seconds, when the source recorded it.
  * @property {WorkoutSource} source
  * @property {string | null} externalId  Provider's activity id, used to de-duplicate imports.
  * @property {string | null} startedAt   Exact start time (ISO) for imported workouts; null for manual ones.
@@ -54,10 +55,18 @@ export const validateWorkoutInput = ({ date, activity, distanceKm }, today, allo
   return errors;
 };
 
+/** Elapsed seconds from an importer, or null when the workout has no recorded time. */
+export const durationSeconds = (value) => {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return Math.round(seconds);
+};
+
 export const createWorkout = ({
   date,
   activity,
   distance,
+  duration = null,
   source = WORKOUT_SOURCES.MANUAL,
   externalId = null,
   startedAt = null,
@@ -66,6 +75,7 @@ export const createWorkout = ({
   date,
   activity,
   distance: Math.round(distance),
+  duration: durationSeconds(duration),
   source,
   externalId: externalId == null ? null : String(externalId),
   startedAt,
@@ -77,6 +87,10 @@ export const sortWorkoutsByDate = (workouts) =>
   [...workouts].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
 
 export const totalDistance = (workouts) => workouts.reduce((sum, w) => sum + w.distance, 0);
+
+/** Sum of recorded elapsed times. Workouts without a duration contribute nothing. */
+export const totalWorkoutDuration = (workouts) =>
+  workouts.reduce((sum, workout) => sum + (workout.duration > 0 ? workout.duration : 0), 0);
 
 export const latestWorkout = (workouts) => {
   let latest = null;
@@ -96,13 +110,35 @@ const externalKey = (workout) =>
  * so repeated syncs from Strava/Garmin are idempotent.
  */
 export const mergeImportedWorkouts = (existing, incoming) => {
-  const seen = new Set(existing.map(externalKey).filter(Boolean));
+  const indexByKey = new Map();
+  existing.forEach((workout, index) => {
+    const key = externalKey(workout);
+    if (key) indexByKey.set(key, index);
+  });
+  let filled = existing;
   const added = [];
+  const seenAdded = new Set();
   for (const workout of incoming) {
     const key = externalKey(workout);
-    if (key && seen.has(key)) continue;
-    if (key) seen.add(key);
+    if (key && indexByKey.has(key)) {
+      const index = indexByKey.get(key);
+      const previous = filled[index];
+      // A repeat import can fill in elapsed time that an older copy never stored.
+      if (previous && !(previous.duration > 0) && workout.duration > 0) {
+        if (filled === existing) filled = [...existing];
+        filled[index] = { ...previous, duration: workout.duration };
+      }
+      continue;
+    }
+    if (key) {
+      if (seenAdded.has(key)) continue;
+      seenAdded.add(key);
+    }
     added.push(workout);
   }
-  return { workouts: sortWorkoutsByDate([...existing, ...added]), added };
+  return {
+    workouts: added.length ? sortWorkoutsByDate([...filled, ...added]) : filled,
+    added,
+    filled: filled !== existing,
+  };
 };

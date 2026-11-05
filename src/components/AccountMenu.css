@@ -90,6 +90,11 @@
   text-align: left;
 }
 
+.menu-item.selected {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
 .menu-item:hover,
 .menu-row:hover > .menu-item,
 .menu-row:focus-within > .menu-item {

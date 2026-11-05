@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDistance, formatDuration, placeCity, todayLocalIsoDate } from './format';
+import { formatDistance, formatDuration, monthAgoLocalIsoDate, placeCity, todayLocalIsoDate } from './format';
 
 describe('format', () => {
   it('formats distances', () => {
@@ -21,5 +21,11 @@ describe('format', () => {
 
   it('uses the local calendar day for "today"', () => {
     expect(todayLocalIsoDate(new Date(2025, 0, 5, 0, 30))).toBe('2025-01-05');
+  });
+
+  it('steps back one calendar month and clamps the day', () => {
+    expect(monthAgoLocalIsoDate(new Date(2026, 10, 5))).toBe('2026-10-05');
+    expect(monthAgoLocalIsoDate(new Date(2026, 2, 31))).toBe('2026-02-28');
+    expect(monthAgoLocalIsoDate(new Date(2024, 2, 31))).toBe('2024-02-29');
   });
 });

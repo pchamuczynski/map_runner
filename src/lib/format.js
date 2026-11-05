@@ -43,3 +43,10 @@ export const todayLocalIsoDate = (now = new Date()) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 };
+
+/** The same local calendar day one month earlier, clamped to the end of that month. */
+export const monthAgoLocalIsoDate = (now = new Date()) => {
+  const lastDay = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+  const date = new Date(now.getFullYear(), now.getMonth() - 1, Math.min(now.getDate(), lastDay));
+  return todayLocalIsoDate(date);
+};

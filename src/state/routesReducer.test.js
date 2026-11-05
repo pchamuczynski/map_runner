@@ -29,6 +29,10 @@ describe('routesReducer', () => {
     expect(state.routes[0].workouts.map((w) => w.id)).toEqual([w2.id]);
     expect(getCoveredDistance(state.routes[0])).toBe(2000);
     expect(state.revision).toBe(3);
+
+    state = routesReducer(state, { type: 'WORKOUTS_DELETED', routeId: route.id, workoutIds: [w2.id] });
+    expect(state.routes[0].workouts).toEqual([]);
+    expect(state.revision).toBe(4);
   });
 
   it('keeps workouts sorted by date', () => {

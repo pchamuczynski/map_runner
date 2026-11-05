@@ -8,6 +8,7 @@ describe('Strava mapper', () => {
       id: 123,
       sport_type: 'TrailRun',
       distance: 10432.5,
+      elapsed_time: 5400,
       start_date: '2025-06-01T21:30:00Z',
       start_date_local: '2025-06-01T23:30:00Z',
     });
@@ -15,6 +16,7 @@ describe('Strava mapper', () => {
       date: '2025-06-01',
       activity: 'Running',
       distance: 10433,
+      duration: 5400,
       source: 'strava',
       externalId: '123',
       startedAt: '2025-06-01T21:30:00.000Z',
@@ -45,12 +47,14 @@ describe('Garmin mapper', () => {
       activityId: 987,
       activityType: 'ROAD_BIKING',
       distanceInMeters: 42000,
+      durationInSeconds: 3661,
       startTimeInSeconds: Date.UTC(2025, 5, 1, 23, 30) / 1000,
       startTimeOffsetInSeconds: 7200,
     });
     expect(workout).toMatchObject({
       date: '2025-06-02',
       activity: 'Cycling',
+      duration: 3661,
       source: 'garmin',
       externalId: '987',
       startedAt: '2025-06-01T23:30:00.000Z',

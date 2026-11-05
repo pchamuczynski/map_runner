@@ -20,8 +20,8 @@ const ENABLED_AT = new Date('2025-03-01T12:00:00.000Z');
 const makeRoute = (name, activities, { enabled = true, now = ENABLED_AT, routeActivities = ACTIVITIES } = {}) =>
   createRoute({ name, from: 'A', to: 'B', activities: routeActivities, autoImport: { enabled, activities } }, geometry, now);
 
-const imported = (activity, startedAt, externalId, { distance = 5000, source = 'strava' } = {}) =>
-  createWorkout({ date: startedAt.slice(0, 10), activity, distance, source, externalId, startedAt });
+const imported = (activity, startedAt, externalId, { distance = 5000, duration = null, source = 'strava' } = {}) =>
+  createWorkout({ date: startedAt.slice(0, 10), activity, distance, duration, source, externalId, startedAt });
 
 const externalIds = (route) => route.workouts.map((w) => w.externalId);
 
@@ -159,6 +159,39 @@ describe('distributeImportedWorkouts', () => {
     const again = assignWorkoutsToRoutes(first.routes, [past], [route.id]);
     expect(again.addedCount).toBe(0);
     expect(again.routes[0]).toBe(first.routes[0]);
+
+    const timed = assignWorkoutsToRoutes(first.routes, [imported('Running', '2020-01-01T08:00:00.000Z', 'old', { duration: 2400 })], [route.id]);
+    expect(timed.addedCount).toBe(0);
+    expect(timed.filledCount).toBe(1);
+    expect(timed.routes[0].workouts[0].duration).toBe(2400);
+    expect(timed.routes[0]).not.toBe(first.routes[0]);
+  });
+
+  it('keeps, replaces, or retains workouts that overlap in time', () => {
+    const route = makeRoute('R', ['Running'], { enabled: false, routeActivities: ['Running'] });
+    const early = imported('Running', '2025-06-01T08:00:00.000Z', 'early', { duration: 3600, distance: 5000 });
+    const placed = assignWorkoutsToRoutes([route], [early], [route.id]);
+    const overlapping = imported('Running', '2025-06-01T08:30:00.000Z', 'late', { duration: 3600, distance: 4000 });
+    const after = imported('Running', '2025-06-01T10:00:00.000Z', 'after', { duration: 600, distance: 1000 });
+
+    const keptOld = assignWorkoutsToRoutes(placed.routes, [overlapping, after], [route.id], 'old');
+    expect(externalIds(keptOld.routes[0])).toEqual(['early', 'after']);
+    expect(keptOld.overlapCount).toBe(1);
+    expect(keptOld.addedCount).toBe(1);
+
+    const touching = imported('Running', '2025-06-01T09:00:00.000Z', 'touch', { duration: 600, distance: 1000 });
+    const touched = assignWorkoutsToRoutes(placed.routes, [touching], [route.id], 'old');
+    expect(touched.overlapCount).toBe(0);
+    expect(externalIds(touched.routes[0])).toEqual(['early', 'touch']);
+
+    const keptNew = assignWorkoutsToRoutes(placed.routes, [overlapping], [route.id], 'new');
+    expect(externalIds(keptNew.routes[0])).toEqual(['late']);
+    expect(keptNew.removedCount).toBe(1);
+    expect(keptNew.addedCount).toBe(1);
+
+    const keptBoth = assignWorkoutsToRoutes(placed.routes, [overlapping], [route.id], 'both');
+    expect(externalIds(keptBoth.routes[0])).toEqual(['early', 'late']);
+    expect(keptBoth.overlapCount).toBe(1);
   });
 
   it('fetch window covers only routes still collecting imports', () => {

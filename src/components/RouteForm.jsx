@@ -7,16 +7,15 @@ import { isRouteCompleted } from '../domain/autoImport';
 import { DEFAULT_ROUTE_ACTIVITIES, ROUTE_LIMITS, createRoute, updateRoute, validateRouteInput } from '../domain/route';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useRouteCalculation } from '../hooks/useRouteCalculation';
-import { formatDistance, formatDuration } from '../lib/format';
+import { formatDistance } from '../lib/format';
 import ActivityPicker from './ActivityPicker';
 import LocationAutocomplete from './LocationAutocomplete';
 import './RouteForm.css';
 
-const PROVIDER_LABELS = { google: 'Google Maps', osrm: 'OpenStreetMap (OSRM)' };
-
 const importHint = (route) => {
   if (route && isRouteCompleted(route)) return 'This route is completed, so no more workouts will be imported.';
-  return "New workouts of this route's activities are added automatically. Use Import past workouts on the route to add older ones.";
+  if (route) return "New workouts of this route's activities are added automatically. Import past workouts to add older ones.";
+  return "New workouts of this route's activities are added automatically.";
 };
 
 /**
@@ -25,9 +24,10 @@ const importHint = (route) => {
  *   onSubmit: (route: import('../domain/route').Route) => void,
  *   onCancel: () => void,
  *   onPreview: (route: object | null) => void,
+ *   onImportPast?: (routeId: string) => void,
  * }} props
  */
-const RouteForm = ({ route, onSubmit, onCancel, onPreview }) => {
+const RouteForm = ({ route, onSubmit, onCancel, onPreview, onImportPast }) => {
   const isEdit = Boolean(route);
   const [name, setName] = useState(route?.name ?? '');
   const [from, setFrom] = useState(route?.from ?? '');
@@ -40,6 +40,7 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview }) => {
   );
   const [errors, setErrors] = useState({});
 
+  const completed = isEdit && isRouteCompleted(route);
   const endpointsChanged = !isEdit || from.trim() !== route.from || to.trim() !== route.to;
   const calculation = useRouteCalculation(from, to, { skip: !endpointsChanged });
   const geometry = endpointsChanged ? calculation.geometry : route;
@@ -151,6 +152,11 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview }) => {
             Import new workouts
           </label>
           {autoImport.enabled && <p className="field-hint">{importHint(route)}</p>}
+          {isEdit && !completed && (
+            <button type="button" className="btn btn-secondary btn-small import-past-form-btn" onClick={() => onImportPast(route.id)}>
+              Import past workouts
+            </button>
+          )}
           {errors.autoImport && <p className="field-error">{errors.autoImport}</p>}
         </fieldset>
 
@@ -165,8 +171,6 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview }) => {
           <div className="alert alert-success">
             <div className="route-stats">
               <span>📏 Distance: {formatDistance(geometry.distance)}</span>
-              <span>⏱️ Duration: {formatDuration(geometry.duration)}</span>
-              <span>🗺️ Provider: {PROVIDER_LABELS[geometry.provider] ?? geometry.provider}</span>
             </div>
             {isEdit && endpointsChanged && (
               <p className="alert alert-warning">

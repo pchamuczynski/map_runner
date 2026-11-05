@@ -21,6 +21,13 @@ const LeafletRouteMap = ({ path, endpoints, progressMarker }) => {
   }, []);
 
   useEffect(() => {
+    if (!scene || !containerRef.current) return undefined;
+    const observer = new ResizeObserver(() => scene.map.invalidateSize());
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [scene]);
+
+  useEffect(() => {
     if (!scene) return;
     scene.polyline.setLatLngs(path ?? []);
     if (path) scene.map.fitBounds(scene.polyline.getBounds(), { padding: [20, 20] });

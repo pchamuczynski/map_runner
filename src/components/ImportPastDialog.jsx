@@ -2,89 +2,141 @@
  * Pulls already-recorded workouts from Garmin onto one route.
  * The route's activity types decide what is listed; the user chooses which to add.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isRouteCompleted } from '../domain/autoImport';
+import { countOverlappingImports } from '../domain/overlap';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { todayLocalIsoDate } from '../lib/format';
+import { monthAgoLocalIsoDate, todayLocalIsoDate } from '../lib/format';
 import { fetchNewWorkouts } from '../services/integrations';
 import { useAuth } from '../state/contexts';
+import ActivityFilter from './ActivityFilter';
 import { importPeriodError } from './importPeriod';
+import ImportPeriodFields from './ImportPeriodFields';
+import OverlapPolicyPicker from './OverlapPolicyPicker';
 import WorkoutCheckList from './WorkoutCheckList';
-import { takenWorkoutKeys, workoutKey, workoutsInPeriod } from './workoutChoice';
+import { activityTypesIn, takenWorkoutKeys, withKeysChecked, workoutKey, workoutsInPeriod, workoutsOfTypes } from './workoutChoice';
 import './ImportPastDialog.css';
 
-const daysAgo = (days) => {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return todayLocalIsoDate(date);
-};
-
-const ImportPastDialog = ({ route, onClose, onImported }) => {
+const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
   const { user, accountsAvailable } = useAuth();
-  const [from, setFrom] = useState(daysAgo(365));
-  const [to, setTo] = useState(todayLocalIsoDate());
+  const [from, setFrom] = useState(monthAgoLocalIsoDate);
+  const [to, setTo] = useState(todayLocalIsoDate);
   const [found, setFound] = useState(null);
+  const [typeFilter, setTypeFilter] = useState(() => new Set());
   const [picked, setPicked] = useState(() => new Set());
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pendingOverlaps, setPendingOverlaps] = useState(0);
   const signedIn = accountsAvailable && user && !user.isGuest;
   const completed = isRouteCompleted(route);
+  const activityKey = route.activities.join('\0');
 
   useEscapeKey(onClose);
 
-  const changePeriod = (setter) => (event) => {
-    setter(event.target.value);
+  const clearList = () => {
     setFound(null);
+    setTypeFilter(new Set());
     setPicked(new Set());
     setMessage('');
     setError('');
+    setPendingOverlaps(0);
   };
 
-  const showWorkouts = async () => {
-    setError('');
-    setMessage('');
+  const changeFrom = (value) => {
+    setFrom(value);
+    clearList();
+  };
+
+  const changeTo = (value) => {
+    setTo(value);
+    clearList();
+  };
+
+  useEffect(() => {
+    if (!signedIn || completed) return undefined;
     const periodError = importPeriodError(from, to, todayLocalIsoDate());
     if (periodError) {
-      setError(periodError);
-      return;
-    }
-    if (completed) {
-      setError('This route is already complete, so no more workouts can be added.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const workouts = workoutsInPeriod(await fetchNewWorkouts('garmin', { from, to }), {
-        from,
-        to,
-        activities: route.activities,
-      });
-      setFound(workouts);
-      setPicked(new Set(workouts.map(workoutKey)));
-      if (workouts.length === 0) setMessage("No workouts of this route's activity types in that period.");
-    } catch (err) {
       setFound(null);
-      setError(err?.message || 'Could not load workouts from Garmin.');
-    } finally {
+      setTypeFilter(new Set());
+      setPicked(new Set());
+      setMessage('');
+      setError(periodError);
       setBusy(false);
+      return undefined;
     }
+
+    let cancelled = false;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    (async () => {
+      try {
+        const workouts = workoutsInPeriod(await fetchNewWorkouts('garmin', { from, to }), {
+          from,
+          to,
+          activities: activityKey ? activityKey.split('\0') : [],
+        });
+        if (cancelled) return;
+        setFound(workouts);
+        setTypeFilter(new Set(activityTypesIn(workouts)));
+        setPicked(new Set(workouts.map(workoutKey)));
+        if (workouts.length === 0) setMessage("No workouts of this route's activity types in that period.");
+      } catch (err) {
+        if (cancelled) return;
+        setFound(null);
+        setError(err?.message || 'Could not load workouts from Garmin.');
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [from, to, signedIn, completed, activityKey]);
+
+  const chosenWorkouts = () => workoutsOfTypes(found ?? [], typeFilter).filter((workout) => picked.has(workoutKey(workout)));
+
+  const finishImport = (chosen, nextPolicy) => {
+    onImported(chosen, nextPolicy);
+    onClose();
   };
 
   const importSelected = () => {
     setError('');
     setMessage('');
-    const chosen = (found ?? []).filter((workout) => picked.has(workoutKey(workout)));
+    const chosen = chosenWorkouts();
     if (chosen.length === 0) {
       setError('Select at least one workout.');
       return;
     }
-    const added = onImported(chosen);
-    setMessage(
-      added > 0
-        ? `Added ${added} workout${added === 1 ? '' : 's'} to ${route.name}.`
-        : 'None of the selected workouts were added. They may already be on this route.',
-    );
+    const overlaps = countOverlappingImports(route.workouts, chosen);
+    if (overlaps > 0 && !policy) {
+      setPendingOverlaps(overlaps);
+      return;
+    }
+    finishImport(chosen, policy ?? 'both');
+  };
+
+  const choosePolicy = (nextPolicy) => {
+    const chosen = chosenWorkouts();
+    onPolicy(nextPolicy);
+    setPendingOverlaps(0);
+    if (chosen.length === 0) return;
+    finishImport(chosen, nextPolicy);
+  };
+
+  const visible = workoutsOfTypes(found ?? [], typeFilter);
+  const visibleSelected = visible.filter((workout) => picked.has(workoutKey(workout)));
+
+  const toggleType = (activity) => {
+    setTypeFilter((current) => {
+      const next = new Set(current);
+      if (next.has(activity)) next.delete(activity);
+      else next.add(activity);
+      return next;
+    });
   };
 
   const toggle = (key) => {
@@ -122,33 +174,48 @@ const ImportPastDialog = ({ route, onClose, onImported }) => {
           </p>
         ) : (
           <>
-            <div className="import-past-dates">
-              <label>
-                From
-                <input type="date" value={from} max={to} onChange={changePeriod(setFrom)} />
-              </label>
-              <label>
-                To
-                <input type="date" value={to} min={from} max={todayLocalIsoDate()} onChange={changePeriod(setTo)} />
-              </label>
-            </div>
-            <p className="field-hint">All workouts in this period start checked. Uncheck any you want to leave out.</p>
+            <ImportPeriodFields from={from} to={to} onFrom={changeFrom} onTo={changeTo} />
             {completed && <p className="field-hint">This route is already complete, so no more workouts can be added.</p>}
-            <button type="button" className="btn btn-secondary btn-small" onClick={showWorkouts} disabled={busy || completed}>
-              {busy ? 'Loading…' : 'Show workouts'}
-            </button>
+            {busy && <p className="field-hint">Loading workouts…</p>}
             {found?.length > 0 && (
               <>
-                <WorkoutCheckList
-                  workouts={found}
-                  selectedKeys={picked}
-                  takenKeys={takenWorkoutKeys(found, [route])}
-                  onToggle={toggle}
-                  onSetAll={(checked) => setPicked(checked ? new Set(found.map(workoutKey)) : new Set())}
-                />
-                <button type="button" className="btn btn-primary btn-small" onClick={importSelected} disabled={busy || picked.size === 0}>
-                  Import selected
-                </button>
+                <ActivityFilter types={activityTypesIn(found)} selected={typeFilter} onToggle={toggleType} />
+                {visible.length > 0 ? (
+                  <>
+                    <WorkoutCheckList
+                      workouts={visible}
+                      selectedKeys={picked}
+                      takenKeys={takenWorkoutKeys(visible, [route])}
+                      onToggle={toggle}
+                      onSetAll={(checked) => setPicked((current) => withKeysChecked(current, visible, checked))}
+                    />
+                    <OverlapPolicyPicker policy={policy} onChange={onPolicy} />
+                    {pendingOverlaps > 0 && !policy && (
+                      <div className="overlap-prompt" role="group" aria-label="Choose what to do with overlapping workouts">
+                        <p className="field-hint">
+                          {pendingOverlaps === 1
+                            ? '1 selected workout overlaps one already on this route.'
+                            : `${pendingOverlaps} selected workouts overlap ones already on this route.`}{' '}
+                          This choice is remembered for every route.
+                        </p>
+                        <button type="button" className="btn btn-secondary btn-small" onClick={() => choosePolicy('old')}>
+                          Keep old
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-small" onClick={() => choosePolicy('new')}>
+                          Keep new
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-small" onClick={() => choosePolicy('both')}>
+                          Keep both
+                        </button>
+                      </div>
+                    )}
+                    <button type="button" className="btn btn-primary btn-small" onClick={importSelected} disabled={busy || visibleSelected.length === 0}>
+                      Import selected
+                    </button>
+                  </>
+                ) : (
+                  <p className="field-hint">No workouts of the selected activity types.</p>
+                )}
               </>
             )}
             {message && <p className="field-hint import-past-message">{message}</p>}

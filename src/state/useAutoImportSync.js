@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { earliestImportStart } from '../domain/autoImport';
+import { readOverlapPolicy } from '../domain/overlapPolicy';
 import { isAbortError } from '../lib/http';
 import { enabledIntegrations, syncEnabledIntegrations } from '../services/integrations';
 
@@ -24,7 +25,7 @@ export const useAutoImportSync = ({ status, routes, importWorkouts }) => {
         errors
           .filter(({ error }) => error?.status !== 404 && error?.status !== 503)
           .forEach(({ id, error }) => console.warn(`Workout sync from ${id} failed`, error));
-        if (workouts.length > 0) importWorkouts(workouts);
+        if (workouts.length > 0) importWorkouts(workouts, readOverlapPolicy() ?? 'both');
       } catch (error) {
         if (!isAbortError(error)) console.warn('Workout sync failed', error);
       }
