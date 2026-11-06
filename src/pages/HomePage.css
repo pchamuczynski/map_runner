@@ -2,6 +2,8 @@
   --sidebar-width: 290px;
   display: flex;
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .map-area {
@@ -43,4 +45,51 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.routes-toggle,
+.routes-backdrop {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .map-area {
+    margin-left: 0;
+  }
+
+  .page-alert {
+    margin: 8px 8px 0;
+  }
+
+  .map-account {
+    max-width: calc(100% - 24px);
+    padding: 2px;
+  }
+
+  .routes-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 990;
+    border: none;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .routes-toggle {
+    display: inline-flex;
+    align-items: center;
+    position: absolute;
+    left: 12px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 1100;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 999px;
+    background: white;
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  }
 }

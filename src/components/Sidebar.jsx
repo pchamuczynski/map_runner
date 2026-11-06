@@ -24,6 +24,7 @@ const Sidebar = ({
   selectedRouteId,
   width,
   onWidthChange,
+  onClose,
   onSelectRoute,
   onAddRoute,
   onEditRoute,
@@ -145,6 +146,9 @@ const Sidebar = ({
       <div className="sidebar-header">
         <h2>ROUTES</h2>
         {status === 'loading' && <span className="spinner" aria-label="Loading routes" />}
+        <button type="button" className="sidebar-close" onClick={onClose} aria-label="Close routes">
+          ×
+        </button>
       </div>
       <div className="sidebar-content">
         <button type="button" className="add-route-btn" onClick={onAddRoute} disabled={status !== 'ready'}>

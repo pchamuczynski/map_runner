@@ -57,3 +57,9 @@
   color: #aaa;
   cursor: default;
 }
+
+@media (max-width: 760px) {
+  .import-period-dates {
+    flex-direction: column;
+  }
+}

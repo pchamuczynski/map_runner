@@ -22,6 +22,7 @@ import './HomePage.css';
 
 const SIDEBAR_WIDTH = { min: 240, max: 640, fallback: 290 };
 const SIDEBAR_WIDTH_KEY = 'mapRunner:v2:sidebar-width';
+const COMPACT_QUERY = '(max-width: 760px)';
 
 const readSidebarWidth = () => {
   try {
@@ -55,6 +56,8 @@ const HomePage = () => {
   const seenRoutes = useRef(null);
   const [connectionVersion, setConnectionVersion] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
+  const [compact, setCompact] = useState(() => window.matchMedia(COMPACT_QUERY).matches);
+  const [routesOpen, setRoutesOpen] = useState(false);
 
   const selectedRoute = routes.find((route) => route.id === selectedRouteId) ?? null;
   const importRoute = routes.find((route) => route.id === importRouteId) ?? null;
@@ -66,6 +69,18 @@ const HomePage = () => {
   const showWorkoutForm = Boolean(dialogRoute) && (dialog.type === 'addWorkout' || (dialog.type === 'editWorkout' && dialogWorkout));
 
   const closeDialog = useCallback(() => setDialog(null), []);
+  const closeRoutes = useCallback(() => setRoutesOpen(false), []);
+
+  useEffect(() => {
+    const media = window.matchMedia(COMPACT_QUERY);
+    const apply = () => {
+      setCompact(media.matches);
+      if (!media.matches) setRoutesOpen(false);
+    };
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, []);
 
   useEffect(() => {
     if (status !== 'ready') {
@@ -108,13 +123,26 @@ const HomePage = () => {
     window.history.replaceState(null, '', `${window.location.pathname}${next ? `?${next}` : ''}`);
   }, []);
 
-  const handleAddRoute = useCallback(() => setDialog({ type: 'createRoute' }), []);
-  const handleEditRoute = useCallback((routeId) => setDialog({ type: 'editRoute', routeId }), []);
-  const handleAddWorkout = useCallback((routeId) => setDialog({ type: 'addWorkout', routeId }), []);
-  const handleEditWorkout = useCallback(
-    (routeId, workoutId) => setDialog({ type: 'editWorkout', routeId, workoutId }),
-    [],
-  );
+  const handleAddRoute = useCallback(() => {
+    setDialog({ type: 'createRoute' });
+    setRoutesOpen(false);
+  }, []);
+  const handleEditRoute = useCallback((routeId) => {
+    setDialog({ type: 'editRoute', routeId });
+    setRoutesOpen(false);
+  }, []);
+  const handleSelectRoute = useCallback((routeId) => {
+    setSelectedRouteId(routeId);
+    setRoutesOpen(false);
+  }, []);
+  const handleAddWorkout = useCallback((routeId) => {
+    setDialog({ type: 'addWorkout', routeId });
+    setRoutesOpen(false);
+  }, []);
+  const handleEditWorkout = useCallback((routeId, workoutId) => {
+    setDialog({ type: 'editWorkout', routeId, workoutId });
+    setRoutesOpen(false);
+  }, []);
 
   const handleDeleteRoute = useCallback(
     async (routeId, anchor) => {
@@ -167,14 +195,15 @@ const HomePage = () => {
   };
 
   return (
-    <div className="home-page" style={{ '--sidebar-width': `${sidebarWidth}px` }}>
+    <div className={`home-page${compact && routesOpen ? ' routes-open' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` }}>
       <Sidebar
         width={sidebarWidth}
         onWidthChange={handleSidebarWidth}
+        onClose={closeRoutes}
         routes={routes}
         status={status}
         selectedRouteId={selectedRouteId}
-        onSelectRoute={setSelectedRouteId}
+        onSelectRoute={handleSelectRoute}
         onAddRoute={handleAddRoute}
         onEditRoute={handleEditRoute}
         onDeleteRoute={handleDeleteRoute}
@@ -224,6 +253,14 @@ const HomePage = () => {
 
         <div className="map-stage">
           <RouteMap route={preview ?? selectedRoute} />
+          {compact && routesOpen && (
+            <button type="button" className="routes-backdrop" aria-label="Close routes" onClick={closeRoutes} />
+          )}
+          {compact && !routesOpen && !showRouteForm && !showWorkoutForm && (
+            <button type="button" className="routes-toggle" onClick={() => setRoutesOpen(true)}>
+              Routes
+            </button>
+          )}
           <div className="map-account">
             <AccountMenu
               connectionVersion={connectionVersion}

@@ -41,6 +41,12 @@
   cursor: default;
 }
 
+@media (max-width: 760px) {
+  .account-name {
+    display: none;
+  }
+}
+
 .account-sign-in {
   min-width: 0;
   padding: 6px 14px;

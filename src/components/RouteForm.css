@@ -46,3 +46,15 @@ fieldset.auto-import {
   margin-top: 8px;
 }
 
+@media (max-width: 760px) {
+  .route-form-panel {
+    top: 56px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100% - 72px);
+    padding: 16px;
+  }
+}
+
