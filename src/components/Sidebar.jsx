@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { isRouteCompleted } from '../domain/autoImport';
+import Brand from './Brand';
 import RouteListItem from './RouteListItem';
 import './Sidebar.css';
 
@@ -144,7 +145,7 @@ const Sidebar = ({
   return (
     <aside className="sidebar" aria-label="Routes">
       <div className="sidebar-header">
-        <h2>ROUTES</h2>
+        <Brand heading />
         {status === 'loading' && <span className="spinner" aria-label="Loading routes" />}
         <button type="button" className="sidebar-close" onClick={onClose} aria-label="Close routes">
           ×

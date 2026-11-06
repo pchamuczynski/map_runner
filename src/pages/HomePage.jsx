@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AccountMenu from '../components/AccountMenu';
+import Brand from '../components/Brand';
 import GarminDialog from '../components/GarminDialog';
 import ImportPastDialog from '../components/ImportPastDialog';
 import RouteMap from '../components/map/RouteMap';
@@ -253,6 +254,9 @@ const HomePage = () => {
 
         <div className="map-stage">
           <RouteMap route={preview ?? selectedRoute} />
+          <div className="map-brand" aria-hidden="true">
+            <Brand />
+          </div>
           {compact && routesOpen && (
             <button type="button" className="routes-backdrop" aria-label="Close routes" onClick={closeRoutes} />
           )}

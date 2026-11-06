@@ -48,12 +48,12 @@ fieldset.auto-import {
 
 @media (max-width: 760px) {
   .route-form-panel {
-    top: 56px;
+    top: 72px;
     left: 8px;
     right: 8px;
     width: auto;
     max-width: none;
-    max-height: calc(100% - 72px);
+    max-height: calc(100% - 84px);
     padding: 16px;
   }
 }

@@ -89,14 +89,6 @@
   }
 }
 
-.sidebar-header h2 {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #333;
-  letter-spacing: 0.5px;
-}
-
 .sidebar-content {
   padding: 10px;
   flex: 1;

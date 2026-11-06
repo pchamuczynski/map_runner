@@ -25,6 +25,10 @@
   padding: 4px 8px;
 }
 
+.map-brand {
+  display: none;
+}
+
 .map-stage {
   position: relative;
   flex: 1;
@@ -64,6 +68,26 @@
   .map-account {
     max-width: calc(100% - 24px);
     padding: 2px;
+  }
+
+  .map-brand {
+    display: flex;
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 1300;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    padding: 4px 12px 4px 4px;
+  }
+
+  .home-page.routes-open .map-brand {
+    display: none;
+  }
+
+  .leaflet-top.leaflet-left {
+    top: 68px;
   }
 
   .routes-backdrop {
