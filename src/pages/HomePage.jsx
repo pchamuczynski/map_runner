@@ -7,9 +7,11 @@ import RouteMap from '../components/map/RouteMap';
 import RouteForm from '../components/RouteForm';
 import Sidebar from '../components/Sidebar';
 import WorkoutForm from '../components/WorkoutForm';
-import { assignWorkoutsToRoutes, newlyCompletedRoutes } from '../domain/autoImport';
+import { assignWorkoutsToRoutes, isRouteCompleted, newlyCompletedRoutes } from '../domain/autoImport';
 import { describeImportResult } from '../domain/overlap';
 import { readOverlapPolicy, subscribeOverlapPolicy, writeOverlapPolicy } from '../domain/overlapPolicy';
+import { updateRoute } from '../domain/route';
+import { useConnectedSources } from '../hooks/useConnectedSources';
 import { useAuth, useConfirm, useRoutes } from '../state/contexts';
 import './HomePage.css';
 
@@ -49,13 +51,14 @@ const HomePage = () => {
   /** @type {[Dialog, Function]} */
   const [dialog, setDialog] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [garminDialog, setGarminDialog] = useState(null);
+  const [providerDialog, setProviderDialog] = useState(null);
   const [importRouteId, setImportRouteId] = useState(null);
   const [completedNotice, setCompletedNotice] = useState([]);
   const [importNotice, setImportNotice] = useState('');
   const [overlapPolicy, setOverlapPolicy] = useState(readOverlapPolicy);
   const seenRoutes = useRef(null);
   const [connectionVersion, setConnectionVersion] = useState(0);
+  const { signedIn, connected } = useConnectedSources(connectionVersion);
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const [compact, setCompact] = useState(() => window.matchMedia(COMPACT_QUERY).matches);
   const [routesOpen, setRoutesOpen] = useState(false);
@@ -100,6 +103,25 @@ const HomePage = () => {
 
   const chooseOverlapPolicy = useCallback((policy) => writeOverlapPolicy(policy), []);
 
+  const toggleRouteSource = useCallback(
+    (routeId, sourceId, checked) => {
+      const route = routes.find((item) => item.id === routeId);
+      if (!route || isRouteCompleted(route)) return;
+      const current = route.autoImport.sources ?? [];
+      const sources = (connected ?? []).filter((id) => (id === sourceId ? checked : current.includes(id)));
+      actions.updateRoute(
+        updateRoute(route, {
+          name: route.name,
+          from: route.from,
+          to: route.to,
+          activities: route.activities,
+          autoImport: { enabled: sources.length > 0, activities: route.activities, sources },
+        }),
+      );
+    },
+    [routes, actions, connected],
+  );
+
   const reportImport = useCallback((result, policy, name) => {
     const text = describeImportResult({
       added: result.addedCount,
@@ -115,10 +137,15 @@ const HomePage = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const garmin = params.get('garmin');
-    if (!garmin) return;
-    setGarminDialog({ notice: garmin === 'error' ? params.get('reason') || 'Garmin could not be connected.' : '' });
-    params.delete('garmin');
+    const provider = ['strava', 'garmin'].find((id) => params.get(id));
+    if (!provider) return;
+    const label = provider === 'strava' ? 'Strava' : 'Garmin';
+    setProviderDialog({
+      id: provider,
+      title: label,
+      notice: params.get(provider) === 'error' ? params.get('reason') || `${label} could not be connected.` : '',
+    });
+    params.delete(provider);
     params.delete('reason');
     const next = params.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${next ? `?${next}` : ''}`);
@@ -213,6 +240,9 @@ const HomePage = () => {
         onEditWorkout={handleEditWorkout}
         onDeleteWorkout={handleDeleteWorkout}
         onDeleteWorkouts={handleDeleteWorkouts}
+        signedIn={signedIn}
+        connectedSources={connected}
+        onToggleSource={toggleRouteSource}
       />
 
       <main className="map-area">
@@ -268,9 +298,10 @@ const HomePage = () => {
           <div className="map-account">
             <AccountMenu
               connectionVersion={connectionVersion}
-              overlapPolicy={overlapPolicy}
-              onOverlapPolicy={chooseOverlapPolicy}
-              onManageIntegration={(id) => id === 'garmin' && setGarminDialog({ notice: '' })}
+              onManageIntegration={(id) =>
+                (id === 'garmin' || id === 'strava') &&
+                setProviderDialog({ id, title: id === 'strava' ? 'Strava' : 'Garmin', notice: '' })
+              }
             />
           </div>
           {showRouteForm && (
@@ -281,6 +312,7 @@ const HomePage = () => {
               onCancel={closeDialog}
               onPreview={setPreview}
               onImportPast={setImportRouteId}
+              connectionVersion={connectionVersion}
             />
           )}
         </div>
@@ -291,6 +323,7 @@ const HomePage = () => {
           route={importRoute}
           policy={overlapPolicy}
           onPolicy={chooseOverlapPolicy}
+          connectionVersion={connectionVersion}
           onClose={() => setImportRouteId(null)}
           onImported={(workouts, policy) => {
             const result = assignWorkoutsToRoutes(routes, workouts, [importRoute.id], policy);
@@ -300,21 +333,22 @@ const HomePage = () => {
         />
       )}
 
-      {garminDialog && (
+      {providerDialog && (
         <GarminDialog
+          provider={providerDialog.id}
+          title={providerDialog.title}
           routes={routes}
-          notice={garminDialog.notice}
+          notice={providerDialog.notice}
           policy={overlapPolicy}
           onPolicy={chooseOverlapPolicy}
-          onClose={() => setGarminDialog(null)}
-          onSaveRoutes={actions.setAutoImportRoutes}
+          onClose={() => setProviderDialog(null)}
           onImported={(workouts, routeIds, policy) => {
             const result = assignWorkoutsToRoutes(routes, workouts, routeIds, policy);
             actions.assignWorkouts(workouts, routeIds, policy);
             return reportImport(result, policy, '');
           }}
           onDisconnected={() => {
-            setGarminDialog(null);
+            setProviderDialog(null);
             setConnectionVersion((version) => version + 1);
           }}
         />

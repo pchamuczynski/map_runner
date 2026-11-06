@@ -11,7 +11,7 @@ const fakeGoogleVerifier = async (credential) => {
   return { emailVerified: true, name: null, picture: null, ...JSON.parse(credential) };
 };
 
-export const createTestServer = ({ googleEnabled = true, env = {}, garmin } = {}) => {
+export const createTestServer = ({ googleEnabled = true, env = {}, garmin, strava } = {}) => {
   const config = loadConfig({ NODE_ENV: 'test', DATABASE_PATH: ':memory:', APP_ORIGIN: ORIGIN, ...env });
   const db = openDatabase(':memory:');
   const { app, sessions } = createApp({
@@ -19,6 +19,7 @@ export const createTestServer = ({ googleEnabled = true, env = {}, garmin } = {}
     db,
     verifyGoogleCredential: googleEnabled ? fakeGoogleVerifier : null,
     ...(garmin ? { garmin } : {}),
+    ...(strava ? { strava } : {}),
   });
 
   /** A cookie-keeping client that sends the headers the real frontend sends. */

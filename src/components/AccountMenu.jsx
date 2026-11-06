@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { OVERLAP_POLICIES } from '../domain/overlap';
 import { connectUrl, enabledIntegrations, listConnections } from '../services/integrations';
 import { useAuth } from '../state/contexts';
 import AuthDialog from './AuthDialog';
@@ -14,7 +13,7 @@ const initials = (name) =>
     .join('');
 
 /** Header area: "Sign in" for guests, a hover menu for signed-in users. */
-const AccountMenu = ({ onManageIntegration, connectionVersion = 0, overlapPolicy = null, onOverlapPolicy }) => {
+const AccountMenu = ({ onManageIntegration, connectionVersion = 0 }) => {
   const { user, status, accountsAvailable, logOut } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState('');
@@ -112,29 +111,6 @@ const AccountMenu = ({ onManageIntegration, connectionVersion = 0, overlapPolicy
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-            <div className="menu-row">
-              <button type="button" className="menu-item" role="menuitem" aria-haspopup="true">
-                Overlapping workouts
-                <span aria-hidden="true">›</span>
-              </button>
-              <div className="menu-flyout">
-                <div className="account-dropdown-panel" role="menu">
-                  <p className="menu-empty">When an import overlaps a workout already on a route.</p>
-                  {OVERLAP_POLICIES.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`menu-item${overlapPolicy === option.id ? ' selected' : ''}`}
-                      role="menuitemradio"
-                      aria-checked={overlapPolicy === option.id}
-                      onClick={() => onOverlapPolicy(option.id)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>

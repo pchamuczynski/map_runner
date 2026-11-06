@@ -66,6 +66,18 @@ const MIGRATIONS = [
     PRIMARY KEY (user_id, external_id)
   );
   `,
+  // 3: Strava OAuth expiry and the activities pulled for a user
+  `
+  ALTER TABLE integrations ADD COLUMN expires_at TEXT;
+
+  CREATE TABLE strava_activities (
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    external_id TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    started_at  TEXT NOT NULL,
+    PRIMARY KEY (user_id, external_id)
+  );
+  `,
 ];
 
 /** Runs `fn` atomically; rolls back if it throws. */

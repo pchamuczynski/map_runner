@@ -1,10 +1,11 @@
 /**
  * Create / edit route panel. Shown beside the map so the calculated route can be previewed.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ACTIVITIES } from '../domain/activities';
-import { isRouteCompleted } from '../domain/autoImport';
+import { IMPORT_SOURCE_IDS, importSourceLabel, isRouteCompleted } from '../domain/autoImport';
 import { DEFAULT_ROUTE_ACTIVITIES, ROUTE_LIMITS, createRoute, updateRoute, validateRouteInput } from '../domain/route';
+import { useConnectedSources } from '../hooks/useConnectedSources';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useRouteCalculation } from '../hooks/useRouteCalculation';
 import { formatDistance } from '../lib/format';
@@ -14,8 +15,8 @@ import './RouteForm.css';
 
 const importHint = (route) => {
   if (route && isRouteCompleted(route)) return 'This route is completed, so no more workouts will be imported.';
-  if (route) return "New workouts of this route's activities are added automatically. Import past workouts to add older ones.";
-  return "New workouts of this route's activities are added automatically.";
+  if (route) return 'New workouts from the selected services are added automatically. Import past workouts to add older ones.';
+  return 'New workouts from the selected services are added automatically.';
 };
 
 /**
@@ -25,20 +26,19 @@ const importHint = (route) => {
  *   onCancel: () => void,
  *   onPreview: (route: object | null) => void,
  *   onImportPast?: (routeId: string) => void,
+ *   connectionVersion?: number,
  * }} props
  */
-const RouteForm = ({ route, onSubmit, onCancel, onPreview, onImportPast }) => {
+const RouteForm = ({ route, onSubmit, onCancel, onPreview, onImportPast, connectionVersion = 0 }) => {
   const isEdit = Boolean(route);
   const [name, setName] = useState(route?.name ?? '');
   const [from, setFrom] = useState(route?.from ?? '');
   const [to, setTo] = useState(route?.to ?? '');
   const [activities, setActivities] = useState(route?.activities ?? DEFAULT_ROUTE_ACTIVITIES);
-  const [autoImport, setAutoImport] = useState(
-    route
-      ? { enabled: route.autoImport.enabled, activities: route.activities, since: route.autoImport.since }
-      : { enabled: true, activities: [...DEFAULT_ROUTE_ACTIVITIES], since: null },
-  );
+  const [sources, setSources] = useState(() => new Set(route?.autoImport.sources ?? []));
+  const sourcesTouched = useRef(isEdit);
   const [errors, setErrors] = useState({});
+  const { signedIn, connected } = useConnectedSources(connectionVersion);
 
   const completed = isEdit && isRouteCompleted(route);
   const endpointsChanged = !isEdit || from.trim() !== route.from || to.trim() !== route.to;
@@ -58,28 +58,42 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview, onImportPast }) => {
 
   useEscapeKey(onCancel);
 
-  const changeAutoImport = (update) => {
-    setAutoImport(update);
-    setErrors((prev) => ({ ...prev, autoImport: undefined }));
-  };
+  useEffect(() => {
+    if (sourcesTouched.current || connected == null) return;
+    setSources(new Set(connected));
+  }, [connected]);
 
   const toggleActivity = (activity, checked) => {
     const next = ACTIVITIES.filter((a) => (a === activity ? checked : activities.includes(a)));
     setActivities(next);
     setErrors((prev) => ({ ...prev, activities: undefined, autoImport: undefined }));
-    setAutoImport((prev) => (prev.enabled ? { ...prev, activities: next } : prev));
   };
 
-  const toggleAutoImport = (enabled) => changeAutoImport({ ...autoImport, enabled, activities: enabled ? activities : autoImport.activities });
+  const toggleSource = (id, checked) => {
+    sourcesTouched.current = true;
+    setSources((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setErrors((prev) => ({ ...prev, autoImport: undefined }));
+  };
+
+  const chosenSourcesVisible = (connected ?? []).some((id) => sources.has(id));
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const chosen =
+      connected == null
+        ? IMPORT_SOURCE_IDS.filter((id) => sources.has(id))
+        : connected.filter((id) => sources.has(id));
     const details = {
       name,
       from,
       to,
       activities,
-      autoImport: { enabled: autoImport.enabled, activities: autoImport.enabled ? activities : [] },
+      autoImport: { enabled: chosen.length > 0, activities, sources: chosen },
     };
     const validation = validateRouteInput(details);
     setErrors(validation);
@@ -146,12 +160,28 @@ const RouteForm = ({ route, onSubmit, onCancel, onPreview, onImportPast }) => {
         </fieldset>
 
         <fieldset className="form-group auto-import">
-          <legend className="visually-hidden">Automatic import</legend>
-          <label className="checkbox-row">
-            <input type="checkbox" checked={autoImport.enabled} onChange={(e) => toggleAutoImport(e.target.checked)} />
-            Import new workouts
-          </label>
-          {autoImport.enabled && <p className="field-hint">{importHint(route)}</p>}
+          <legend className="form-legend">Import new workouts from</legend>
+          {!signedIn && <p className="field-hint">Sign in to import workouts from Strava or Garmin.</p>}
+          {signedIn && connected === null && <p className="field-hint">Loading connected services…</p>}
+          {signedIn && connected?.length === 0 && (
+            <p className="field-hint">Connect Strava or Garmin from the account menu, then choose them here.</p>
+          )}
+          {signedIn && connected?.length > 0 && (
+            <div className="auto-import-options">
+              {connected.map((id) => (
+                <label key={id} className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={sources.has(id)}
+                    disabled={completed}
+                    onChange={(event) => toggleSource(id, event.target.checked)}
+                  />
+                  {importSourceLabel(id)}
+                </label>
+              ))}
+            </div>
+          )}
+          {chosenSourcesVisible && <p className="field-hint">{importHint(route)}</p>}
           {isEdit && !completed && (
             <button type="button" className="btn btn-secondary btn-small import-past-form-btn" onClick={() => onImportPast(route.id)}>
               Import past workouts

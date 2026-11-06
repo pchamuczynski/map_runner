@@ -1,10 +1,11 @@
 /**
- * Pulls already-recorded workouts from Garmin onto one route.
+ * Pulls already-recorded workouts from connected apps onto one route.
  * The route's activity types decide what is listed; the user chooses which to add.
  */
 import { useEffect, useState } from 'react';
-import { isRouteCompleted } from '../domain/autoImport';
+import { IMPORT_SOURCE_IDS, importSourceLabel, isRouteCompleted } from '../domain/autoImport';
 import { countOverlappingImports } from '../domain/overlap';
+import { useConnectedSources } from '../hooks/useConnectedSources';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { monthAgoLocalIsoDate, todayLocalIsoDate } from '../lib/format';
 import { fetchNewWorkouts } from '../services/integrations';
@@ -12,15 +13,16 @@ import { useAuth } from '../state/contexts';
 import ActivityFilter from './ActivityFilter';
 import { importPeriodError } from './importPeriod';
 import ImportPeriodFields from './ImportPeriodFields';
-import OverlapPolicyPicker from './OverlapPolicyPicker';
 import WorkoutCheckList from './WorkoutCheckList';
 import { activityTypesIn, takenWorkoutKeys, withKeysChecked, workoutKey, workoutsInPeriod, workoutsOfTypes } from './workoutChoice';
 import './ImportPastDialog.css';
 
-const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
+const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported, connectionVersion = 0 }) => {
   const { user, accountsAvailable } = useAuth();
+  const { connected } = useConnectedSources(connectionVersion);
   const [from, setFrom] = useState(monthAgoLocalIsoDate);
   const [to, setTo] = useState(todayLocalIsoDate);
+  const [serviceChoice, setServiceChoice] = useState(null);
   const [found, setFound] = useState(null);
   const [typeFilter, setTypeFilter] = useState(() => new Set());
   const [picked, setPicked] = useState(() => new Set());
@@ -31,6 +33,8 @@ const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
   const signedIn = accountsAvailable && user && !user.isGuest;
   const completed = isRouteCompleted(route);
   const activityKey = route.activities.join('\0');
+  const selectedServices = serviceChoice ?? connected ?? [];
+  const servicesKey = connected == null ? '' : IMPORT_SOURCE_IDS.filter((id) => selectedServices.includes(id)).join('\0');
 
   useEscapeKey(onClose);
 
@@ -53,6 +57,16 @@ const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
     clearList();
   };
 
+  const toggleService = (id) => {
+    clearList();
+    setServiceChoice((current) => {
+      const next = new Set(current ?? connected ?? []);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return IMPORT_SOURCE_IDS.filter((sourceId) => next.has(sourceId));
+    });
+  };
+
   useEffect(() => {
     if (!signedIn || completed) return undefined;
     const periodError = importPeriodError(from, to, todayLocalIsoDate());
@@ -66,13 +80,39 @@ const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
       return undefined;
     }
 
+    if (connected === null) return undefined;
+
+    if (!servicesKey) {
+      setFound(null);
+      setTypeFilter(new Set());
+      setPicked(new Set());
+      setBusy(false);
+      setError('');
+      setPendingOverlaps(0);
+      setMessage(connected.length === 0 ? 'Connect Strava or Garmin from the account menu first.' : 'Choose a service to import from.');
+      return undefined;
+    }
+
     let cancelled = false;
     setBusy(true);
     setError('');
     setMessage('');
     (async () => {
       try {
-        const workouts = workoutsInPeriod(await fetchNewWorkouts('garmin', { from, to }), {
+        const loaded = await Promise.allSettled(
+          servicesKey.split('\0').map(async (id) => {
+            try {
+              return await fetchNewWorkouts(id, { from, to });
+            } catch (err) {
+              if (err?.status === 404 || err?.status === 503) return [];
+              throw err;
+            }
+          }),
+        );
+        const failure = loaded.find((result) => result.status === 'rejected');
+        const received = loaded.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+        if (received.length === 0 && failure) throw failure.reason;
+        const workouts = workoutsInPeriod(received, {
           from,
           to,
           activities: activityKey ? activityKey.split('\0') : [],
@@ -85,7 +125,7 @@ const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
       } catch (err) {
         if (cancelled) return;
         setFound(null);
-        setError(err?.message || 'Could not load workouts from Garmin.');
+        setError(err?.message || 'Could not load workouts.');
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -94,7 +134,7 @@ const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
     return () => {
       cancelled = true;
     };
-  }, [from, to, signedIn, completed, activityKey]);
+  }, [from, to, signedIn, completed, activityKey, servicesKey, connected]);
 
   const chosenWorkouts = () => workoutsOfTypes(found ?? [], typeFilter).filter((workout) => picked.has(workoutKey(workout)));
 
@@ -170,10 +210,21 @@ const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
 
         {!signedIn ? (
           <p className="field-error" role="alert">
-            Sign in to import workouts from Garmin.
+            Sign in to import workouts from Strava or Garmin.
           </p>
         ) : (
           <>
+            <fieldset className="form-group">
+              <legend className="form-legend">Import from</legend>
+              {connected === null && <p className="field-hint">Loading connected services…</p>}
+              {connected?.length === 0 && <p className="field-hint">Connect Strava or Garmin from the account menu first.</p>}
+              {connected?.map((id) => (
+                <label key={id} className="checkbox-row">
+                  <input type="checkbox" checked={selectedServices.includes(id)} onChange={() => toggleService(id)} />
+                  {importSourceLabel(id)}
+                </label>
+              ))}
+            </fieldset>
             <ImportPeriodFields from={from} to={to} onFrom={changeFrom} onTo={changeTo} />
             {completed && <p className="field-hint">This route is already complete, so no more workouts can be added.</p>}
             {busy && <p className="field-hint">Loading workouts…</p>}
@@ -189,7 +240,6 @@ const ImportPastDialog = ({ route, policy, onPolicy, onClose, onImported }) => {
                       onToggle={toggle}
                       onSetAll={(checked) => setPicked((current) => withKeysChecked(current, visible, checked))}
                     />
-                    <OverlapPolicyPicker policy={policy} onChange={onPolicy} />
                     {pendingOverlaps > 0 && !policy && (
                       <div className="overlap-prompt" role="group" aria-label="Choose what to do with overlapping workouts">
                         <p className="field-hint">

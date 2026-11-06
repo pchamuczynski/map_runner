@@ -557,6 +557,22 @@
   background-color: #ffebee;
 }
 
+.route-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 6px;
+}
+
+.route-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+}
+
 .route-auto-import {
   display: block;
   margin-top: 2px;

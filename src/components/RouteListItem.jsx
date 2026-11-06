@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { completionDate, isRouteCompleted } from '../domain/autoImport';
+import { completionDate, importSourceLabel, isRouteCompleted } from '../domain/autoImport';
 import { getCoveredDistance, getProgress } from '../domain/route';
 import { totalWorkoutDuration } from '../domain/workout';
 import { formatDate, formatDateTime, formatDistance, formatDuration, formatPercent, placeCity } from '../lib/format';
@@ -20,6 +20,9 @@ const RouteListItem = memo(function RouteListItem({
   onDeleteWorkout,
   onDeleteWorkouts,
   dragHandlers,
+  signedIn = false,
+  connectedSources = null,
+  onToggleSource,
 }) {
   const progress = getProgress(route);
   const workoutCount = route.workouts.length;
@@ -102,13 +105,32 @@ const RouteListItem = memo(function RouteListItem({
                 )}
                 {!completed && route.autoImport.enabled && (
                   <span className="route-auto-import" title={`Importing workouts recorded since ${formatDateTime(route.autoImport.since)}`}>
-                    🔄 Auto-import: {route.autoImport.activities.join(', ')}
+                    Importing since {formatDateTime(route.autoImport.since)}
                   </span>
                 )}
               </span>
             )}
           </button>
         </div>
+
+        {!completed && signedIn && connectedSources && (
+          <div className="route-sources">
+            {connectedSources.length === 0 ? (
+              <span className="route-auto-import">Connect Strava or Garmin to import workouts.</span>
+            ) : (
+              connectedSources.map((id) => (
+                <label key={id} className="route-source">
+                  <input
+                    type="checkbox"
+                    checked={(route.autoImport.sources ?? []).includes(id)}
+                    onChange={(event) => onToggleSource(route.id, id, event.target.checked)}
+                  />
+                  {importSourceLabel(id)}
+                </label>
+              ))
+            )}
+          </div>
+        )}
 
         {!folded && <div className="route-progress">
           <div

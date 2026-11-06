@@ -2,7 +2,7 @@
  * Pure reducer for route/workout state. Every mutation goes through here, so each
  * user action produces exactly one consistent state update (and one save).
  */
-import { assignWorkoutsToRoutes, distributeImportedWorkouts } from '../domain/autoImport';
+import { IMPORT_SOURCE_IDS, assignWorkoutsToRoutes, distributeImportedWorkouts } from '../domain/autoImport';
 import { updateRoute, withWorkouts } from '../domain/route';
 
 export const initialRoutesState = Object.freeze({
@@ -90,16 +90,22 @@ export const routesReducer = (state, action) => {
       let changed = false;
       const routes = state.routes.map((route) => {
         const enabled = selected.has(route.id);
+        const currentSources = route.autoImport.sources ?? [];
+        const sources = enabled ? (currentSources.length > 0 ? currentSources : [...IMPORT_SOURCE_IDS]) : [];
         const next = updateRoute(
           route,
-          { ...route, autoImport: { enabled, activities: enabled ? route.activities : route.autoImport.activities } },
+          {
+            ...route,
+            autoImport: { enabled, activities: enabled ? route.activities : route.autoImport.activities, sources },
+          },
           route,
           now,
         );
         const same =
           next.autoImport.enabled === route.autoImport.enabled &&
           next.autoImport.since === route.autoImport.since &&
-          next.autoImport.activities.join('\0') === route.autoImport.activities.join('\0');
+          next.autoImport.activities.join('\0') === route.autoImport.activities.join('\0') &&
+          next.autoImport.sources.join('\0') === currentSources.join('\0');
         if (same) return route;
         changed = true;
         return next;

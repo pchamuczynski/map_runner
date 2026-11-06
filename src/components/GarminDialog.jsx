@@ -1,6 +1,6 @@
 /**
- * After Garmin is connected: choose which routes receive new workouts, and
- * optionally pull workouts from a date range onto those routes.
+ * After a service is connected: pull workouts from a date range onto the routes
+ * the user picks. Ongoing import is chosen on each route.
  */
 import { useEffect, useState } from 'react';
 import { countOverlappingImports } from '../domain/overlap';
@@ -10,14 +10,14 @@ import { disconnectIntegration, fetchNewWorkouts } from '../services/integration
 import ActivityFilter from './ActivityFilter';
 import { importPeriodError } from './importPeriod';
 import ImportPeriodFields from './ImportPeriodFields';
-import OverlapPolicyPicker from './OverlapPolicyPicker';
 import WorkoutCheckList from './WorkoutCheckList';
 import { activityTypesIn, takenWorkoutKeys, withKeysChecked, workoutKey, workoutsInPeriod, workoutsOfTypes } from './workoutChoice';
 import './GarminDialog.css';
 
-const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes, onImported, onDisconnected }) => {
+const GarminDialog = ({ provider = 'garmin', title = 'Garmin', routes, notice, policy, onPolicy, onClose, onImported, onDisconnected }) => {
   const [pickedRoutes, setPickedRoutes] = useState(null);
-  const selected = pickedRoutes ?? new Set(routes.filter((route) => route.autoImport.enabled).map((route) => route.id));
+  const selected =
+    pickedRoutes ?? new Set(routes.filter((route) => route.autoImport.sources?.includes(provider)).map((route) => route.id));
   const [from, setFrom] = useState(monthAgoLocalIsoDate);
   const [to, setTo] = useState(todayLocalIsoDate);
   const [found, setFound] = useState(null);
@@ -60,12 +60,6 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
     setError('');
   };
 
-  const saveRoutes = () => {
-    setError('');
-    onSaveRoutes([...selected]);
-    setMessage('New workouts will be added to the selected routes.');
-  };
-
   const chosenRoutes = routes.filter((route) => selected.has(route.id));
   const selectedKey = chosenRoutes.map((route) => route.id).join('\0');
   const activityKey = chosenRoutes.flatMap((route) => route.activities).join('\0');
@@ -92,7 +86,7 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
     setMessage('');
     (async () => {
       try {
-        const workouts = workoutsInPeriod(await fetchNewWorkouts('garmin', { from, to }), {
+        const workouts = workoutsInPeriod(await fetchNewWorkouts(provider, { from, to }), {
           from,
           to,
           activities: activityKey ? activityKey.split('\0') : [],
@@ -105,7 +99,7 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
       } catch (err) {
         if (cancelled) return;
         setFound(null);
-        setError(err?.message || 'Could not load workouts from Garmin.');
+        setError(err?.message || `Could not load workouts from ${title}.`);
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -114,7 +108,7 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
     return () => {
       cancelled = true;
     };
-  }, [from, to, selectedKey, activityKey]);
+  }, [from, to, selectedKey, activityKey, provider, title]);
 
   const chosenWorkouts = () => workoutsOfTypes(found ?? [], typeFilter).filter((workout) => picked.has(workoutKey(workout)));
 
@@ -174,10 +168,10 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
     setBusy(true);
     setError('');
     try {
-      await disconnectIntegration('garmin');
+      await disconnectIntegration(provider);
       onDisconnected();
     } catch (err) {
-      setError(err?.message || 'Could not disconnect Garmin.');
+      setError(err?.message || `Could not disconnect ${title}.`);
       setBusy(false);
     }
   };
@@ -185,20 +179,20 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
   return (
     <div className="dialog-overlay" onMouseDown={onClose}>
       <section
-        className="dialog garmin-dialog"
+        className="dialog provider-dialog"
         role="dialog"
-        aria-labelledby="garmin-dialog-title"
+        aria-labelledby="provider-dialog-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="dialog-header">
-          <h3 id="garmin-dialog-title">Garmin</h3>
+          <h3 id="provider-dialog-title">{title}</h3>
           <button type="button" className="close-btn" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
 
         <fieldset className="form-group">
-          <legend className="form-legend">Add new workouts to these routes</legend>
+          <legend className="form-legend">Add imported workouts to</legend>
           {routes.length === 0 ? (
             <p className="field-hint">Create a route first. New routes import workouts of their activity types.</p>
           ) : (
@@ -216,9 +210,6 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
               ))}
             </ul>
           )}
-          <button type="button" className="btn btn-secondary btn-small" onClick={saveRoutes} disabled={busy || routes.length === 0}>
-            Save routes
-          </button>
         </fieldset>
 
         <fieldset className="form-group">
@@ -238,7 +229,6 @@ const GarminDialog = ({ routes, notice, policy, onPolicy, onClose, onSaveRoutes,
                     onToggle={toggleWorkout}
                     onSetAll={(checked) => setPicked((current) => withKeysChecked(current, visible, checked))}
                   />
-                  <OverlapPolicyPicker policy={policy} onChange={onPolicy} name="garmin-overlap-policy" />
                   {pendingOverlaps > 0 && !policy && (
                     <div className="overlap-prompt" role="group" aria-label="Choose what to do with overlapping workouts">
                       <p className="field-hint">

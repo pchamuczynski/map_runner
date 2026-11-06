@@ -35,6 +35,9 @@ const Sidebar = ({
   onEditWorkout,
   onDeleteWorkout,
   onDeleteWorkouts,
+  signedIn = false,
+  connectedSources = null,
+  onToggleSource,
 }) => {
   const [draggedId, setDraggedId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
@@ -137,6 +140,9 @@ const Sidebar = ({
           onDeleteWorkout={onDeleteWorkout}
           onDeleteWorkouts={onDeleteWorkouts}
           dragHandlers={dragHandlers}
+          signedIn={signedIn}
+          connectedSources={connectedSources}
+          onToggleSource={onToggleSource}
         />
       ))}
     </ul>

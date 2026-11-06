@@ -2,8 +2,10 @@
  * Connected apps. OAuth starts and finishes in the browser; tokens stay here.
  * Garmin pushes new activities to /api/integrations/garmin/push (no session cookie).
  */
+import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import { GarminError } from '../integrations/garmin.js';
+import { StravaError } from '../integrations/strava.js';
 import { HttpError } from '../middleware/errors.js';
 import { requireUser } from '../middleware/session.js';
 import { createIntegrationRepository } from '../repositories/integrations.js';
@@ -63,7 +65,17 @@ export const createGarminPushHandler = ({ db, garmin }) => {
   };
 };
 
-export const createIntegrationRouter = ({ config, db, garmin }) => {
+const canReadActivities = (scope) => /(^|[, ])activity:read(_all)?($|[, ])/.test(scope);
+
+const freshStravaToken = async (strava, repo, row) => {
+  const expires = Date.parse(row.expires_at ?? '');
+  if (Number.isFinite(expires) && expires - Date.now() > 120_000) return row.token;
+  const next = await strava.refresh(row.token_secret);
+  repo.save(row.user_id, 'strava', next.accessToken, next.refreshToken, next.expiresAt);
+  return next.accessToken;
+};
+
+export const createIntegrationRouter = ({ config, db, garmin, strava }) => {
   const repo = createIntegrationRepository(db);
   const router = Router();
 
@@ -162,6 +174,106 @@ export const createIntegrationRouter = ({ config, db, garmin }) => {
       res.json(stored);
     } catch (error) {
       next(error instanceof GarminError ? new HttpError(502, 'Garmin could not be reached') : error);
+    }
+  });
+
+  router.get('/strava/connect', requireUser, (req, res) => {
+    if (!strava?.configured) {
+      return res.redirect(home(config, { strava: 'error', reason: 'Add Strava API credentials on the server, then try again' }));
+    }
+    const state = randomBytes(32).toString('hex');
+    repo.saveRequest(state, req.user.id, 'strava', '');
+    const redirectUri = `${config.appOrigins[0]}/api/integrations/strava/callback`;
+    res.redirect(strava.authorizeUrl(redirectUri, state));
+  });
+
+  router.get('/strava/callback', async (req, res) => {
+    const state = one(req.query.state);
+    const code = one(req.query.code);
+    const pending = state ? repo.takeRequest(state) : null;
+    const scope = `${one(req.query.scope)}`;
+    if (one(req.query.error) || !pending || pending.provider !== 'strava' || !code) {
+      return res.redirect(home(config, { strava: 'error', reason: 'Strava connection was cancelled' }));
+    }
+    if (!canReadActivities(scope)) {
+      return res.redirect(home(config, { strava: 'error', reason: 'Allow Treklin to read your Strava activities' }));
+    }
+    try {
+      const token = await strava.exchangeCode(code);
+      repo.save(pending.user_id, 'strava', token.accessToken, token.refreshToken, token.expiresAt);
+      res.redirect(home(config, { strava: 'connected' }));
+    } catch {
+      res.redirect(home(config, { strava: 'error', reason: 'Strava could not finish the connection' }));
+    }
+  });
+
+  router.delete('/strava', requireUser, async (req, res, next) => {
+    try {
+      const row = repo.get(req.user.id, 'strava');
+      if (row && strava?.configured) {
+        let token = row.token;
+        try {
+          token = await freshStravaToken(strava, repo, row);
+        } catch {
+          token = row.token;
+        }
+        try {
+          await strava.deauthorize(token);
+        } catch (error) {
+          if (!(error instanceof StravaError) || (error.status !== 401 && error.status !== 404)) throw error;
+        }
+      }
+      if (row) repo.remove(req.user.id, 'strava');
+      res.status(204).end();
+    } catch (error) {
+      next(error instanceof StravaError ? new HttpError(502, 'Strava could not be reached') : error);
+    }
+  });
+
+  router.get('/strava/activities', requireUser, async (req, res, next) => {
+    try {
+      if (!strava?.configured) throw new HttpError(503, 'Strava is not configured on the server');
+      const row = repo.get(req.user.id, 'strava');
+      if (!row) throw new HttpError(404, 'Strava is not connected');
+
+      const from = one(req.query.from);
+      const to = one(req.query.to);
+      const since = one(req.query.since);
+      if ((from || to) && (!DATE.test(from) || !DATE.test(to) || from > to)) throw new HttpError(400, 'Enter a valid date range');
+      if (from && (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 > MAX_RANGE_DAYS) {
+        throw new HttpError(400, 'Choose a period of at most a year');
+      }
+      if (since && !Number.isFinite(Date.parse(since))) throw new HttpError(400, 'Invalid since');
+
+      let token;
+      try {
+        token = await freshStravaToken(strava, repo, row);
+      } catch (error) {
+        if (error instanceof StravaError && (error.status === 400 || error.status === 401)) {
+          repo.remove(req.user.id, 'strava');
+          throw new HttpError(404, 'Reconnect Strava');
+        }
+        throw error;
+      }
+
+      let fresh = [];
+      try {
+        fresh = await strava.fetchActivities(token, { from: from || undefined, to: to || undefined, since: since || undefined });
+      } catch (error) {
+        if (error instanceof StravaError && error.status === 401) {
+          repo.remove(req.user.id, 'strava');
+          throw new HttpError(404, 'Reconnect Strava');
+        }
+        if (error instanceof StravaError) throw new HttpError(502, 'Strava could not be reached');
+        throw error;
+      }
+      repo.saveStravaActivities(req.user.id, fresh);
+      const stored = from && to
+        ? repo.stravaActivitiesBetween(req.user.id, from, to)
+        : repo.stravaActivitiesSince(req.user.id, since || '1970-01-01T00:00:00.000Z');
+      res.json(stored);
+    } catch (error) {
+      next(error);
     }
   });
 

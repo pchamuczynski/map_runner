@@ -12,13 +12,33 @@
  * @property {boolean} enabled
  * @property {string[]} activities    Workout types to import - always a subset of the route's activities.
  *                                    Kept while disabled so re-enabling restores the choice.
+ * @property {string[]} sources       Connected services to import from (`strava`, `garmin`). Empty while off.
  * @property {string | null} since    ISO timestamp of when auto-import was switched on; null while off.
  */
 import { ACTIVITIES, normalizeActivities } from './activities.js';
 import { intervalsOverlap, workoutInterval } from './overlap.js';
 import { mergeImportedWorkouts, sortWorkoutsByDate, totalDistance } from './workout.js';
 
-export const DEFAULT_AUTO_IMPORT = Object.freeze({ enabled: false, activities: [], since: null });
+/** Services a route can import workouts from, in display order. */
+export const IMPORT_SOURCES = Object.freeze([
+  { id: 'strava', label: 'Strava' },
+  { id: 'garmin', label: 'Garmin' },
+]);
+
+export const IMPORT_SOURCE_IDS = IMPORT_SOURCES.map((source) => source.id);
+
+export const importSourceLabel = (id) => IMPORT_SOURCES.find((source) => source.id === id)?.label ?? id;
+
+export const DEFAULT_AUTO_IMPORT = Object.freeze({ enabled: false, activities: [], sources: [], since: null });
+
+/**
+ * @param {unknown} rawSources
+ * @param {boolean} fallbackToAll  Legacy routes stored `enabled` without naming a service.
+ */
+const normalizeSources = (rawSources, fallbackToAll) => {
+  if (Array.isArray(rawSources)) return IMPORT_SOURCE_IDS.filter((id) => rawSources.includes(id));
+  return fallbackToAll ? [...IMPORT_SOURCE_IDS] : [];
+};
 
 const toIsoTimestamp = (value) => {
   if (typeof value !== 'string') return null;
@@ -35,8 +55,9 @@ const allowedOnly = (activities, allowed) => normalizeActivities(activities).fil
 export const normalizeAutoImport = (raw, allowed = ACTIVITIES) => {
   const activities = allowedOnly(raw?.activities, allowed);
   const since = toIsoTimestamp(raw?.since);
-  const enabled = raw?.enabled === true && since !== null && activities.length > 0;
-  return { enabled, activities, since: enabled ? since : null };
+  const sources = normalizeSources(raw?.sources, raw?.enabled === true);
+  const enabled = sources.length > 0 && since !== null && activities.length > 0;
+  return { enabled, activities, sources: enabled ? sources : [], since: enabled ? since : null };
 };
 
 /**
@@ -44,16 +65,17 @@ export const normalizeAutoImport = (raw, allowed = ACTIVITIES) => {
  * taken from the client: it is stamped when auto-import goes from off to on.
  *
  * @param {AutoImportSettings | null} previous  null for a new route
- * @param {{ enabled?: boolean, activities?: string[] } | undefined} requested
+ * @param {{ enabled?: boolean, activities?: string[], sources?: string[] } | undefined} requested
  * @param {Date} now
  * @param {string[]} allowed  The route's activities.
  */
 export const resolveAutoImport = (previous, requested, now, allowed = ACTIVITIES) => {
   const activities = allowedOnly(requested?.activities, allowed);
-  const enabled = requested?.enabled === true && activities.length > 0;
-  if (!enabled) return { enabled: false, activities, since: null };
+  const sources = normalizeSources(requested?.sources, requested?.sources == null && requested?.enabled === true);
+  const enabled = sources.length > 0 && activities.length > 0;
+  if (!enabled) return { enabled: false, activities, sources: [], since: null };
   const wasEnabled = previous?.enabled === true && previous.since !== null;
-  return { enabled: true, activities, since: wasEnabled ? previous.since : now.toISOString() };
+  return { enabled: true, activities, sources, since: wasEnabled ? previous.since : now.toISOString() };
 };
 
 export const validateAutoImport = (settings) => {
@@ -94,6 +116,7 @@ const recordedAfter = (workout, since) =>
 
 export const routeAcceptsWorkout = (route, workout) =>
   isAutoImportActive(route) &&
+  route.autoImport.sources.includes(workout.source) &&
   route.autoImport.activities.includes(workout.activity) &&
   recordedAfter(workout, route.autoImport.since);
 

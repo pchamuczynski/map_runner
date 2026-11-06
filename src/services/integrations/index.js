@@ -18,8 +18,8 @@ import { mapGarminActivity } from './garmin';
 import { mapStravaActivity } from './strava';
 
 export const INTEGRATIONS = Object.freeze({
-  strava: { id: 'strava', label: 'Strava', enabled: config.features.strava, mapActivity: mapStravaActivity },
-  // Garmin is offered to every signed-in user. The server refuses to connect until its API credentials are set.
+  // Offered to every signed-in user. The server refuses to connect until its API credentials are set.
+  strava: { id: 'strava', label: 'Strava', enabled: config.features.accounts, mapActivity: mapStravaActivity },
   garmin: { id: 'garmin', label: 'Garmin', enabled: config.features.accounts, mapActivity: mapGarminActivity },
 });
 

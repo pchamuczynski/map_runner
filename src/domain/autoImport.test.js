@@ -28,7 +28,12 @@ const externalIds = (route) => route.workouts.map((w) => w.externalId);
 describe('auto-import settings', () => {
   it('stamps "since" when switched on and keeps it on later edits', () => {
     const route = makeRoute('R', ['Running']);
-    expect(route.autoImport).toEqual({ enabled: true, activities: ['Running'], since: ENABLED_AT.toISOString() });
+    expect(route.autoImport).toEqual({
+      enabled: true,
+      activities: ['Running'],
+      sources: ['strava', 'garmin'],
+      since: ENABLED_AT.toISOString(),
+    });
 
     const later = new Date('2025-04-01T00:00:00.000Z');
     const edited = updateRoute(route, { ...route, autoImport: { enabled: true, activities: ['Cycling'] } }, route, later);
@@ -38,7 +43,7 @@ describe('auto-import settings', () => {
   it('starts a new window when switched off and on again', () => {
     const route = makeRoute('R', ['Running']);
     const off = updateRoute(route, { ...route, autoImport: { enabled: false, activities: ['Running'] } });
-    expect(off.autoImport).toEqual({ enabled: false, activities: ['Running'], since: null });
+    expect(off.autoImport).toEqual({ enabled: false, activities: ['Running'], sources: [], since: null });
 
     const reEnabledAt = new Date('2025-05-01T08:00:00.000Z');
     const on = updateRoute(off, { ...off, autoImport: { enabled: true, activities: ['Running'] } }, off, reEnabledAt);
@@ -54,9 +59,16 @@ describe('auto-import settings', () => {
     expect(normalizeAutoImport({ enabled: true, activities: ['Running', 'Other', 'Flying'], since: 'x' })).toEqual({
       enabled: false,
       activities: ['Running'],
+      sources: [],
       since: null,
     });
-    expect(normalizeAutoImport(undefined)).toEqual({ enabled: false, activities: [], since: null });
+    expect(normalizeAutoImport({ enabled: true, activities: ['Running'], since: ENABLED_AT.toISOString() })).toEqual({
+      enabled: true,
+      activities: ['Running'],
+      sources: ['strava', 'garmin'],
+      since: ENABLED_AT.toISOString(),
+    });
+    expect(normalizeAutoImport(undefined)).toEqual({ enabled: false, activities: [], sources: [], since: null });
   });
 
   it('requires at least one type when enabled', () => {
@@ -72,7 +84,7 @@ describe('auto-import settings', () => {
     expect(route.autoImport.activities).toEqual(['Running']);
 
     const none = makeRoute('R', ['Swimming'], { routeActivities: ['Running'] });
-    expect(none.autoImport).toEqual({ enabled: false, activities: [], since: null });
+    expect(none.autoImport).toEqual({ enabled: false, activities: [], sources: [], since: null });
     expect(normalizeAutoImport({ enabled: true, activities: ['Kayaking'], since: ENABLED_AT.toISOString() }, ['Running']).enabled).toBe(
       false,
     );
@@ -131,6 +143,29 @@ describe('distributeImportedWorkouts', () => {
     expect(next.routes[0]).toBe(routes[0]);
     expect(newlyCompletedRoutes([route], routes).map((item) => item.id)).toEqual([route.id]);
     expect(newlyCompletedRoutes(routes, next.routes)).toEqual([]);
+  });
+
+  it('imports a workout only when the route selected that service', () => {
+    const stravaOnly = createRoute(
+      {
+        name: 'S',
+        from: 'A',
+        to: 'B',
+        activities: ['Running'],
+        autoImport: { enabled: true, activities: ['Running'], sources: ['strava'] },
+      },
+      geometry,
+      ENABLED_AT,
+    );
+    const { routes, addedCount } = distributeImportedWorkouts(
+      [stravaOnly],
+      [
+        imported('Running', '2025-03-02T08:00:00.000Z', 's', { source: 'strava' }),
+        imported('Running', '2025-03-02T09:00:00.000Z', 'g', { source: 'garmin' }),
+      ],
+    );
+    expect(externalIds(routes[0])).toEqual(['s']);
+    expect(addedCount).toBe(1);
   });
 
   it('is idempotent across syncs and distinguishes providers', () => {

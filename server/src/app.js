@@ -10,6 +10,7 @@ import helmet from 'helmet';
 import { createGoogleVerifier } from './auth/google.js';
 import { createGarminClient } from './integrations/garmin.js';
 import { createPersonalGarminClient } from './integrations/garminPersonal.js';
+import { createStravaClient } from './integrations/strava.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 import { loadSession, requireUser } from './middleware/session.js';
 import { createRouteSetRepository } from './repositories/routeSets.js';
@@ -30,6 +31,7 @@ export const createApp = ({
   db,
   verifyGoogleCredential = createGoogleVerifier(config.googleClientId),
   garmin = garminFromConfig(config.garmin),
+  strava = createStravaClient(config.strava),
 }) => {
   const users = createUserRepository(db);
   const sessions = createSessionStore(db, { ttlMs: config.sessionTtlMs });
@@ -66,7 +68,7 @@ export const createApp = ({
   api.use(loadSession({ sessions, cookieName: config.cookie.name }));
   api.use('/auth', express.json({ limit: '10kb' }), createAuthRouter({ users, sessions, db, config, verifyGoogleCredential }));
   api.use('/routes', requireUser, express.json({ limit: '10mb' }), createRouteSetRouter({ routeSets }));
-  api.use('/integrations', createIntegrationRouter({ config, db, garmin }));
+  api.use('/integrations', createIntegrationRouter({ config, db, garmin, strava }));
   api.use(notFound);
   app.use('/api', api);
 

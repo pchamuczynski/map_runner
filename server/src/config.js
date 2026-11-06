@@ -30,6 +30,10 @@ const schema = z.object({
   GARMIN_CONSUMER_SECRET: z.string().trim().default(''),
   // Personal API key. Reads only the key owner's data, used when the consumer pair is absent.
   GARMIN_PERSONAL_KEY: z.string().trim().default(''),
+  // Strava API application. The secret never leaves the server.
+  // Authorization Callback Domain is the host of APP_ORIGIN (treklin.com, or localhost for local testing).
+  STRAVA_CLIENT_ID: z.string().trim().default(''),
+  STRAVA_CLIENT_SECRET: z.string().trim().default(''),
 });
 
 export const loadConfig = (env = process.env) => {
@@ -54,6 +58,10 @@ export const loadConfig = (env = process.env) => {
       consumerKey: values.GARMIN_CONSUMER_KEY,
       consumerSecret: values.GARMIN_CONSUMER_SECRET,
       personalKey: values.GARMIN_PERSONAL_KEY,
+    }),
+    strava: Object.freeze({
+      clientId: values.STRAVA_CLIENT_ID,
+      clientSecret: values.STRAVA_CLIENT_SECRET,
     }),
     // Secure cookies require HTTPS; the __Host- prefix additionally pins the cookie to this exact host.
     cookie: Object.freeze({
