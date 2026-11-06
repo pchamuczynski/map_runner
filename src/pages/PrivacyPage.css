@@ -1,0 +1,37 @@
+.privacy-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  color: #213547;
+}
+
+.privacy-home {
+  display: inline-flex;
+  text-decoration: none;
+  margin-bottom: 28px;
+}
+
+.privacy-page h1 {
+  margin: 0 0 16px;
+  font-size: 1.75rem;
+}
+
+.privacy-page h2 {
+  margin: 28px 0 8px;
+  font-size: 1.15rem;
+}
+
+.privacy-page p,
+.privacy-page li {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.privacy-page ul {
+  margin: 8px 0;
+  padding-left: 1.2rem;
+}
+
+.privacy-page li + li {
+  margin-top: 8px;
+}

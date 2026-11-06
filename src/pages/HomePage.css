@@ -14,6 +14,20 @@
   min-width: 0;
 }
 
+.privacy-link {
+  position: fixed;
+  left: 16px;
+  bottom: 10px;
+  z-index: 1101;
+  color: #666;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.privacy-link:hover {
+  text-decoration: underline;
+}
+
 .map-account {
   position: absolute;
   top: 12px;
@@ -98,6 +112,19 @@
     border: none;
     padding: 0;
     background: rgba(0, 0, 0, 0.35);
+  }
+
+  .privacy-link {
+    left: 12px;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    background: white;
+    padding: 6px 10px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  }
+
+  .home-page.routes-open .privacy-link {
+    display: none;
   }
 
   .routes-toggle {

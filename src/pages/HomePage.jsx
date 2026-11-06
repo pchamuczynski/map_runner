@@ -295,6 +295,9 @@ const HomePage = () => {
               Routes
             </button>
           )}
+          <a className="privacy-link" href="/privacy">
+            Privacy
+          </a>
           <div className="map-account">
             <AccountMenu
               connectionVersion={connectionVersion}
